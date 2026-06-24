@@ -575,6 +575,48 @@
       overflow-wrap: anywhere;
     }
 
+    .routing-bar-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .routing-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .routing-label {
+      font-size: .72rem;
+      color: var(--muted);
+      min-width: 170px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .routing-bar-outer {
+      flex: 1;
+      height: 6px;
+      background: var(--panel2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .routing-bar-inner {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #3b82f6, #6366f1);
+      transition: width .4s ease;
+    }
+    .routing-pct {
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--accent);
+      min-width: 32px;
+      text-align: right;
+      font-family: var(--font-mono);
+      flex-shrink: 0;
+    }
+
     .prio-badge {
       display: inline-flex;
       align-items: center;
@@ -1481,6 +1523,21 @@
              data-field="auswirkung">${escHtml(karte.auswirkung)}</div>
       </div>
 
+      ${karte.routing && karte.routing.length > 0 ? `
+      <div class="ai-section">
+        <div class="ai-section-label">🗂 Themenbereich</div>
+        <div class="routing-bar-wrap">
+          ${karte.routing.map(r => `
+            <div class="routing-row">
+              <span class="routing-label">${escHtml(r.kategorie)}</span>
+              <div class="routing-bar-outer">
+                <div class="routing-bar-inner" style="width:${r.gewichtung}%"></div>
+              </div>
+              <span class="routing-pct">${r.gewichtung}%</span>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+
       ${!locked ? `
       <div class="ai-input-area">
         <textarea placeholder="Ergänzungen / Antworten auf die Rückfragen …" rows="3"></textarea>
@@ -1674,15 +1731,23 @@ Antworte AUSSCHLIESSLICH mit diesem JSON-Objekt (kein Markdown, keine Erklärung
     "Konkreter Punkt der noch fehlt: Was genau wird benötigt und warum?",
     "Weiterer fehlender Punkt: Genaue Frage an den Kunden oder Techniker"
   ],
-  "prio": "Hoch",
+  "prio": "Priorität 2",
   "prioBegründung": "1 Satz: Warum diese Priorität? Bezug auf konkrete Auswirkung.",
   "zeiteinschaetzung": "1–2h",
-  "auswirkung": "Was genau ist betroffen (Systeme, Dienste, User), was funktioniert noch, was nicht mehr."
+  "auswirkung": "Was genau ist betroffen (Systeme, Dienste, User), was funktioniert noch, was nicht mehr.",
+  "routing": [
+    { "kategorie": "Exchange / Mail", "gewichtung": 70 },
+    { "kategorie": "Virtualisierung", "gewichtung": 30 }
+  ]
 }
+
+Verfügbare Routing-Kategorien (NUR aus dieser Liste wählen):
+Exchange / Mail | Microsoft 365 / Entra ID / Teams | Windows Server / RDS | Netzwerk / Firewall / VPN | Backup / Recovery | Virtualisierung | Endpoint / Security | Hardware | Telefonie / UC | Sonstiges
 
 Regeln:
 - Zusammenfassung: Keine Floskeln. Fachbegriffe nutzen (DAG, Failover, RDS, GPO, etc.)
 - offeneInfos: Nur wirklich fehlende Infos – keine generischen Fragen die aus den Stichworten schon beantwortet sind. Max. 5 Punkte. Jeder Punkt beginnt mit dem konkreten Thema gefolgt von Doppelpunkt.
+- routing: Wähle 1–3 passende Kategorien. Gewichtungen müssen zusammen exakt 100 ergeben. Nur Kategorien aus der Liste verwenden.
 - Priorität 1 (Kritisch): Totalausfall produktiver Systeme / Datenverlust / Sicherheitsvorfall
 - Priorität 2 (Hoch): Wichtige Systeme eingeschränkt, Redundanz ausgefallen, viele User betroffen
 - Priorität 3 (Mittel): Einzelne User/Funktionen betroffen, Workaround vorhanden
@@ -1819,6 +1884,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         prioBegründung: parsed.prioBegründung || '',
         zeiteinschaetzung: `${parsed.zeiteinschaetzung || '–'} | ${parsed.prioBegründung || ''}`,
         auswirkung: parsed.auswirkung || '',
+        routing: parsed.routing || [],
         editierbar: true
       };
 
