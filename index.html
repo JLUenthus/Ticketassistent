@@ -842,8 +842,9 @@
           </div>
           <textarea class="notes-textarea" id="notes-textarea"
             placeholder="Einfach losschreiben – Stichworte, Fehlercodes, Symptome …&#10;&#10;z.B.: Exchange DAG, Node 2 down, Dienste disabled nach KB5094139, Node 1 OK"></textarea>
-          <div class="card-footer">
-            <button class="btn btn-primary" id="btn-transfer-initial">Übertragen ▶</button>
+          <div class="card-footer" style="gap:8px">
+            <button class="btn btn-ghost" id="btn-copy-prompt-initial" title="Prompt in Zwischenablage kopieren, dann manuell in Claude einfügen">📋 Manuell</button>
+            <button class="btn btn-primary" id="btn-transfer-initial">⚡ API Übertragen</button>
           </div>
         </div>
       </div>
@@ -899,8 +900,13 @@
           <li>Kopiere den angezeigten Key (beginnt mit <code style="font-family:var(--font-mono);color:var(--accent);font-size:.75rem">sk-ant-</code>)</li>
           <li>Füge ihn unten ein und klicke <strong style="color:var(--text)">Speichern</strong></li>
         </ol>
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:.72rem;color:var(--dim)">
-          ⚠️ Den Key nur einmal anzeigen – danach nicht mehr einsehbar. Direkt kopieren!
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <span style="font-size:.72rem;color:var(--dim)">⚠️ Key wird nur einmal angezeigt – direkt kopieren!</span>
+          <a href="https://console.anthropic.com/settings/keys" target="_blank"
+             style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:7px;border:1px solid rgba(124,140,248,.4);background:var(--accent-bg);color:var(--accent);font-size:.72rem;font-weight:700;text-decoration:none;white-space:nowrap;transition:all .15s"
+             onmouseover="this.style.background='rgba(124,140,248,.18)'" onmouseout="this.style.background='var(--accent-bg)'">
+            🔗 Direkt zu API Keys öffnen
+          </a>
         </div>
       </div>
 
@@ -939,6 +945,29 @@
       <div class="modal-btns">
         <button class="btn btn-ghost" id="cache-modal-cancel">Abbrechen</button>
         <button class="btn btn-red" id="cache-modal-confirm">Ja, alles löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL: Manuelle KI-Antwort einfügen ──────────── -->
+  <div class="modal-overlay" id="paste-modal">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-title">📋 KI-Antwort einfügen</div>
+      <div class="modal-desc">
+        Der Prompt wurde kopiert. Öffne jetzt <a href="https://claude.ai" target="_blank" style="color:var(--accent);text-decoration:none">claude.ai</a>,
+        starte einen neuen Chat, füge den Prompt ein und kopiere die komplette Antwort hierher.
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Antwort von Claude hier einfügen</label>
+        <textarea id="paste-modal-input" rows="8"
+          style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:.78rem;line-height:1.6;resize:vertical;outline:none;transition:border-color .15s;width:100%"
+          placeholder='{ "zusammenfassung": "...", "offeneInfos": [...], "prio": "Hoch", ... }'
+          spellcheck="false"></textarea>
+      </div>
+      <div id="paste-modal-error" style="font-size:.75rem;color:var(--red);min-height:1rem;margin-top:-4px"></div>
+      <div class="modal-btns">
+        <button class="btn btn-ghost" id="paste-modal-cancel">Abbrechen</button>
+        <button class="btn btn-primary" id="paste-modal-confirm">Auswertung übernehmen ▶</button>
       </div>
     </div>
   </div>
@@ -1285,7 +1314,8 @@
         <textarea placeholder="Ergänzungen / Antworten auf die Rückfragen …" rows="3"></textarea>
         <div class="ai-actions">
           <button class="btn btn-green btn-finalize">📄 Abschlussbericht anfertigen</button>
-          <button class="btn btn-primary btn-transfer-ai">Übertragen ▶</button>
+          <button class="btn btn-ghost btn-copy-prompt-ai" title="Prompt kopieren, manuell in Claude einfügen">📋 Manuell</button>
+          <button class="btn btn-primary btn-transfer-ai">⚡ API</button>
         </div>
       </div>` : ''}
     `;
@@ -1298,6 +1328,14 @@
       });
       card.querySelector('.btn-finalize').addEventListener('click', () => {
         finalizeReport();
+      });
+      card.querySelector('.btn-copy-prompt-ai').addEventListener('click', () => {
+        const sess = getSession(activeId);
+        if (!sess) return;
+        const extra = card.querySelector('textarea').value.trim();
+        const context = buildContext(sess, extra);
+        _pendingSess = sess;
+        copyPromptToClipboard(context);
       });
     }
 
@@ -1448,6 +1486,56 @@
     });
     if (extraInput) ctx += `Neue Ergänzung des Technikers:\n${extraInput}\n`;
     return ctx;
+  }
+
+  // ── Build copyable prompt ───────────────────────────────
+  const MANUAL_SYSTEM_PROMPT = `Du bist ein IT-Support-Assistent für ein IT-Unternehmen.
+Ein Techniker führt ein Telefongespräch und gibt dir technische Stichworte.
+Keine personenbezogenen Daten – nur technische Inhalte.
+
+Antworte AUSSCHLIESSLICH mit diesem JSON-Objekt (kein Markdown, keine Erklärungen davor oder danach):
+{
+  "zusammenfassung": "Kurze, stichwortartige Zusammenfassung des Falles in 2-4 Sätzen.",
+  "offeneInfos": ["Info die noch fehlt: Beschreibung", "Weitere fehlende Info: Beschreibung"],
+  "prio": "Hoch",
+  "prioBegründung": "Kurze Begründung der Priorität.",
+  "zeiteinschaetzung": "1–2h",
+  "auswirkung": "Was ist betroffen und was funktioniert noch."
+}
+
+Prioritätswerte: Niedrig | Mittel | Hoch | Kritisch
+Zeiteinschätzung als realistischer Stundenrahmen (z.B. "30min", "1–2h", "halber Tag").`;
+
+  function buildPromptText(context) {
+    return MANUAL_SYSTEM_PROMPT + '\n\n---\n\n' + context;
+  }
+
+  function copyPromptToClipboard(context) {
+    const prompt = buildPromptText(context);
+    navigator.clipboard.writeText(prompt).then(() => {
+      showToast('Prompt kopiert – jetzt in Claude einfügen ✓');
+      // Show paste modal so user can paste the response back
+      openPasteModal();
+    }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
+  }
+
+  // ── Manual paste modal logic ─────────────────────────────
+  let _pendingSess = null;
+
+  function openPasteModal() {
+    document.getElementById('paste-modal-input').value = '';
+    openModal('paste-modal');
+    setTimeout(() => document.getElementById('paste-modal-input').focus(), 100);
+  }
+
+  function processPastedResponse(raw) {
+    try {
+      const clean = raw.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+      return parsed;
+    } catch {
+      return null;
+    }
   }
 
   // ── Claude API Call ──────────────────────────────────────
@@ -1772,6 +1860,69 @@ Zeiteinschätzung als realistischer Stundenrahmen (z.B. "30min", "1–2h", "halb
 
   // Transfer initial
   document.getElementById('btn-transfer-initial').addEventListener('click', transferInitial);
+
+  document.getElementById('btn-copy-prompt-initial').addEventListener('click', () => {
+    const sess = getSession(activeId);
+    if (!sess) return;
+    const notizen = document.getElementById('notes-textarea').value.trim();
+    if (!notizen) { showToast('Bitte zuerst Notizen eingeben.', 'error'); return; }
+    sess.notizen = notizen;
+    saveSessions();
+    _pendingSess = sess;
+    copyPromptToClipboard(notizen);
+  });
+
+  // Paste modal events
+  document.getElementById('paste-modal-cancel').addEventListener('click', () => closeModal('paste-modal'));
+
+  document.getElementById('paste-modal-confirm').addEventListener('click', () => {
+    const raw = document.getElementById('paste-modal-input').value.trim();
+    const errEl = document.getElementById('paste-modal-error');
+    if (!raw) { errEl.textContent = 'Bitte die Antwort von Claude einfügen.'; return; }
+    const parsed = processPastedResponse(raw);
+    if (!parsed) {
+      errEl.textContent = 'Antwort konnte nicht verarbeitet werden. Bitte das vollständige JSON von Claude kopieren.';
+      return;
+    }
+    errEl.textContent = '';
+    closeModal('paste-modal');
+
+    const sess = _pendingSess || getSession(activeId);
+    if (!sess) return;
+
+    // Lock previous active card
+    const ws = document.getElementById('workspace');
+    const prevActive = ws.querySelector('.ai-card:not(.locked)');
+    if (prevActive) prevActive.classList.add('locked');
+
+    const now = new Date();
+    const karte = {
+      id: sess.karten.length + 1,
+      timestamp: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0'),
+      eingabe: '',
+      zusammenfassung: parsed.zusammenfassung || '',
+      offeneInfos: parsed.offeneInfos || [],
+      prio: parsed.prio || 'Mittel',
+      prioBegründung: parsed.prioBegründung || '',
+      zeiteinschaetzung: (parsed.zeiteinschaetzung || '–') + (parsed.prioBegründung ? ' | ' + parsed.prioBegründung : ''),
+      auswirkung: parsed.auswirkung || '',
+      editierbar: true
+    };
+
+    sess.karten.push(karte);
+    saveSessions();
+    appendAiCard(karte, false);
+    showToast('KI-Auswertung übernommen ✓');
+    _pendingSess = null;
+  });
+
+  document.getElementById('paste-modal').addEventListener('click', e => {
+    if (e.target.id === 'paste-modal') closeModal('paste-modal');
+  });
+
+  document.getElementById('paste-modal-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.ctrlKey) document.getElementById('paste-modal-confirm').click();
+  });
 
   // Call buttons
   document.getElementById('btn-call-start').addEventListener('click', () => {
