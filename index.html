@@ -779,6 +779,7 @@
       border-radius: var(--r-lg);
       overflow: hidden;
     }
+    #report-section { border-bottom-left-radius: var(--r-lg); border-bottom-right-radius: var(--r-lg); }
     .onenote-header {
       display: flex;
       align-items: center;
@@ -1102,11 +1103,18 @@
           <button class="btn btn-ghost" id="btn-debug-report" style="margin-left:auto;font-size:.72rem;color:var(--dim);border-color:var(--border)" title="Vollständigen Debug-Bericht in Zwischenablage kopieren">🐛 Bericht für Debug</button>
         </div>
 
-        <!-- OneNote Tabelle -->
-        <div class="onenote-section" id="onenote-section">
+      </div><!-- /report-section -->
+
+      <!-- ── OneNote Tabelle (separater Block) ────────────── -->
+      <div id="onenote-separator" style="display:none;align-items:center;gap:12px;margin-top:4px">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:.7rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap">📓 OneNote-Eintrag</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+
+      <div class="onenote-section" id="onenote-section" style="display:none">
           <div class="onenote-header">
-            <span class="onenote-title">📓 OneNote-Eintrag</span>
-            <span style="font-size:.7rem;color:var(--dim)">Felder einzeln oder als Zeile kopieren → direkt in OneNote einfügen</span>
+            <span style="font-size:.7rem;color:var(--dim)">Felder einzeln kopieren oder als Zeile → direkt in OneNote einfügen</span>
           </div>
           <div class="onenote-table-wrap">
             <table class="onenote-table">
@@ -1144,12 +1152,17 @@
               </tbody>
             </table>
           </div>
-          <div class="onenote-row-actions">
+          <div class="onenote-row-actions" style="flex-direction:column;align-items:flex-end;gap:8px">
             <button class="btn btn-primary" id="btn-copy-onenote-row">📋 Ganze Zeile kopieren</button>
+            <div style="font-size:.7rem;color:var(--dim);line-height:1.6;text-align:right;max-width:480px">
+              💡 <strong style="color:var(--muted)">In OneNote einfügen:</strong>
+              Letzte Zelle der Tabelle (Spalte „Bearbeiter") anklicken →
+              <kbd style="background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:.68rem;color:var(--muted)">Tab</kbd>
+              drücken → neue Zeile → erste Zelle anklicken →
+              <kbd style="background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:.68rem;color:var(--muted)">Strg+V</kbd>
+              &nbsp;·&nbsp; Klappt es nicht: Jeden Wert einzeln mit 📋 kopieren.
+            </div>
           </div>
-        </div>
-      </div>
-
     </div>
   </main>
 
@@ -2150,6 +2163,8 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     }
 
     document.getElementById('report-section').style.display = '';
+    document.getElementById('onenote-section').style.display = '';
+    document.getElementById('onenote-separator').style.display = 'flex';
     fillOneNoteTable(sess);
 
     // Lock workspace inputs
@@ -2169,6 +2184,8 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     sess.abgeschlossen = false;
     saveSessions();
     document.getElementById('report-section').style.display = 'none';
+    document.getElementById('onenote-section').style.display = 'none';
+    document.getElementById('onenote-separator').style.display = 'none';
     document.getElementById('notes-textarea').disabled = false;
     document.getElementById('btn-transfer-initial').disabled = false;
     buildWorkspace(sess);
@@ -2800,19 +2817,33 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
   // Copy whole row as tab-separated (pastes as table row in OneNote)
   document.getElementById('btn-copy-onenote-row').addEventListener('click', () => {
     const v = getOneNoteValues();
-    const row = [
+    const vals = [
       v.nr, v.datum, v.uhrzeit, v.name, v.tel,
       v.email, v.firma, v.supportfall, v.weiterleitung,
       v.ticketid, v.beschreibung, v.bearbeiter
-    ].join('\t');
-    navigator.clipboard.writeText(row).then(() => {
-      const btn = document.getElementById('btn-copy-onenote-row');
-      const orig = btn.textContent;
-      btn.textContent = '✓ Zeile kopiert – in OneNote einfügen';
-      btn.style.color = 'var(--green)';
-      btn.style.borderColor = 'rgba(74,222,128,.3)';
-      setTimeout(() => { btn.textContent = orig; btn.style.color=''; btn.style.borderColor=''; }, 2200);
-    }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
+    ];
+
+    // Build HTML table row – OneNote renders this as real table cells
+    const htmlRow = `<table><tbody><tr>${vals.map(c => `<td>${c || ''}</td>`).join('')}</tr></tbody></table>`;
+    const plainRow = vals.join('\t');
+
+    // Write both HTML and plain text to clipboard
+    try {
+      const blob = new Blob([htmlRow], { type: 'text/html' });
+      const plain = new Blob([plainRow], { type: 'text/plain' });
+      const item = new ClipboardItem({ 'text/html': blob, 'text/plain': plain });
+      navigator.clipboard.write([item]).then(() => {
+        const btn = document.getElementById('btn-copy-onenote-row');
+        const orig = btn.textContent;
+        btn.textContent = '✓ Zeile kopiert – in OneNote einfügen';
+        btn.style.color = 'var(--green)';
+        btn.style.borderColor = 'rgba(74,222,128,.3)';
+        setTimeout(() => { btn.textContent = orig; btn.style.color=''; btn.style.borderColor=''; }, 2200);
+      }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
+    } catch {
+      // Fallback plain text
+      navigator.clipboard.writeText(plainRow).then(() => showToast('Als Text kopiert (HTML nicht unterstützt)'));
+    }
   });
 
   // ── START ─────────────────────────────────────────────────
