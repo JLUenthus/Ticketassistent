@@ -461,8 +461,8 @@
       border-radius: var(--r-lg);
       display: flex;
       flex-direction: column;
-      width: 360px;
-      min-width: 360px;
+      width: 420px;
+      min-width: 420px;
       flex-shrink: 0;
       position: relative;
     }
@@ -499,6 +499,8 @@
       white-space: pre-wrap;
       outline: none;
       min-height: 32px;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
     .ai-content[contenteditable="true"]:focus {
       background: rgba(124,140,248,.04);
@@ -513,6 +515,9 @@
       border-radius: 6px;
       border-left: 2px solid var(--amber);
       line-height: 1.4;
+      word-break: break-word;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
 
     .prio-badge {
@@ -808,11 +813,11 @@
 
       <!-- Kontaktdaten -->
       <div class="contact-section">
-        <button class="contact-toggle" id="contact-toggle">
+        <button class="contact-toggle open" id="contact-toggle">
           <span class="contact-toggle-arrow">▶</span>
           <span>📋 Kontaktdaten (optional, werden nicht an KI gesendet)</span>
         </button>
-        <div class="contact-fields hidden" id="contact-fields">
+        <div class="contact-fields" id="contact-fields">
           <div class="field-group">
             <label class="field-label">Name Anrufer</label>
             <input class="field-input" id="f-name" type="text" placeholder="Max Mustermann" autocomplete="off">
@@ -1489,22 +1494,36 @@
   }
 
   // ── Build copyable prompt ───────────────────────────────
-  const MANUAL_SYSTEM_PROMPT = `Du bist ein IT-Support-Assistent für ein IT-Unternehmen.
-Ein Techniker führt ein Telefongespräch und gibt dir technische Stichworte.
+  const MANUAL_SYSTEM_PROMPT = `Du bist ein erfahrener IT-Support-Assistent (enthus GmbH, Microsoft/Windows-Umgebungen).
+Ein Techniker gibt dir Stichworte aus einem laufenden Telefongespräch.
 Keine personenbezogenen Daten – nur technische Inhalte.
+
+Deine Aufgabe: Analysiere die Stichworte präzise und IT-fachlich korrekt.
 
 Antworte AUSSCHLIESSLICH mit diesem JSON-Objekt (kein Markdown, keine Erklärungen davor oder danach):
 {
-  "zusammenfassung": "Kurze, stichwortartige Zusammenfassung des Falles in 2-4 Sätzen.",
-  "offeneInfos": ["Info die noch fehlt: Beschreibung", "Weitere fehlende Info: Beschreibung"],
+  "zusammenfassung": "Fachlich präzise Zusammenfassung in 2-4 Sätzen. Nenne konkrete Systeme, Fehlercodes, Patchstände und den genauen Sachverhalt.",
+  "offeneInfos": [
+    "Konkreter Punkt der noch fehlt: Was genau wird benötigt und warum?",
+    "Weiterer fehlender Punkt: Genaue Frage an den Kunden oder Techniker"
+  ],
   "prio": "Hoch",
-  "prioBegründung": "Kurze Begründung der Priorität.",
+  "prioBegründung": "1 Satz: Warum diese Priorität? Bezug auf konkrete Auswirkung.",
   "zeiteinschaetzung": "1–2h",
-  "auswirkung": "Was ist betroffen und was funktioniert noch."
+  "auswirkung": "Was genau ist betroffen (Systeme, Dienste, User), was funktioniert noch, was nicht mehr."
 }
 
-Prioritätswerte: Niedrig | Mittel | Hoch | Kritisch
-Zeiteinschätzung als realistischer Stundenrahmen (z.B. "30min", "1–2h", "halber Tag").`;
+Regeln:
+- Zusammenfassung: Keine Floskeln. Fachbegriffe nutzen (DAG, Failover, RDS, GPO, etc.)
+- offeneInfos: Nur wirklich fehlende Infos – keine generischen Fragen die aus den Stichworten schon beantwortet sind. Max. 5 Punkte. Jeder Punkt beginnt mit dem konkreten Thema gefolgt von Doppelpunkt.
+- prio Kritisch: Totalausfall produktiver Systeme / Datenverlust / Sicherheitsvorfall
+- prio Hoch: Wichtige Systeme eingeschränkt, Redundanz ausgefallen, viele User betroffen
+- prio Mittel: Einzelne User/Funktionen betroffen, Workaround vorhanden
+- prio Niedrig: Kosmetisch, nice-to-have, kein Produktivitätsverlust
+- Zeiteinschätzung: Realistisch für erfahrenen Techniker. z.B. "30min", "1–2h", "2–4h", "halber Tag", "1–2 Tage"
+- Auswirkung: Immer auch erwähnen was NOCH funktioniert (Mailfluss über Node 1, etc.)
+
+Prioritätswerte: Niedrig | Mittel | Hoch | Kritisch`;
 
   function buildPromptText(context) {
     return MANUAL_SYSTEM_PROMPT + '\n\n---\n\n' + context;
@@ -1572,22 +1591,7 @@ Zeiteinschätzung als realistischer Stundenrahmen (z.B. "30min", "1–2h", "halb
     ws.appendChild(loadingCard);
     ws.scrollLeft = ws.scrollWidth;
 
-    const systemPrompt = `Du bist ein IT-Support-Assistent für ein IT-Unternehmen.
-Ein Techniker führt ein Telefongespräch und gibt dir technische Stichworte.
-Keine personenbezogenen Daten – nur technische Inhalte.
-
-Antworte IMMER ausschließlich mit diesem JSON-Objekt (kein Markdown, keine Erklärungen):
-{
-  "zusammenfassung": "Kurze, stichwortartige Zusammenfassung des Falles in 2-4 Sätzen.",
-  "offeneInfos": ["Info die noch fehlt: Beschreibung", "Weitere fehlende Info: Beschreibung"],
-  "prio": "Hoch",
-  "prioBegründung": "Kurze Begründung der Priorität.",
-  "zeiteinschaetzung": "1–2h",
-  "auswirkung": "Was ist betroffen und was funktioniert noch."
-}
-
-Prioritätswerte: Niedrig | Mittel | Hoch | Kritisch
-Zeiteinschätzung als realistischer Stundenrahmen (z.B. "30min", "1–2h", "halber Tag").`;
+    const systemPrompt = MANUAL_SYSTEM_PROMPT;
 
     try {
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
