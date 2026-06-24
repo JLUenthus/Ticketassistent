@@ -865,7 +865,7 @@
               style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.7rem;font-weight:600;cursor:pointer;font-family:var(--font-ui);transition:all .15s"
               onmouseover="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'"
               onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--dim)'">
-              📋 Kopieren
+              📋 Alle Kontaktdaten kopieren
             </button>
           </div>
           <div style="display:flex;gap:24px;flex-wrap:wrap" id="report-contact-fields"></div>
@@ -1860,9 +1860,14 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     const contactFields = document.getElementById('report-contact-fields');
     if (contactItems.length > 0) {
       contactFields.innerHTML = contactItems.map(i => `
-        <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="display:flex;flex-direction:column;gap:4px">
           <span style="font-size:.65rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em">${i.label}</span>
-          <span style="font-size:.85rem;color:var(--text);font-weight:600">${i.value}</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:.85rem;color:var(--text);font-weight:600">${i.value}</span>
+            <button onclick="navigator.clipboard.writeText('${i.value.replace(/'/g, "\\'")}').then(()=>{ this.textContent='✓'; this.style.color='var(--green)'; this.style.borderColor='rgba(74,222,128,.3)'; setTimeout(()=>{ this.textContent='📋'; this.style.color=''; this.style.borderColor=''; },1500); })"
+              style="padding:1px 6px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.68rem;cursor:pointer;flex-shrink:0;transition:all .15s;font-family:var(--font-ui)"
+              title="${i.label} kopieren">📋</button>
+          </div>
         </div>`).join('');
       contactBlock.style.display = '';
     } else {
