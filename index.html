@@ -1648,9 +1648,10 @@
 
       <div class="ai-section">
         <div class="ai-section-label">⚡ Vorabbewertung</div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <span class="prio-badge prio-${karte.prio.replace('Priorität ','')}" data-field="prioBadge">${escHtml(karte.prio)}</span>
-          <span style="font-size:.78rem;color:var(--muted)" data-field="zeiteinschaetzung">${escHtml(karte.zeiteinschaetzung)}</span>
+          ${(karte.routing || []).map(r => `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.25);color:#2dd4bf;font-size:.7rem;font-weight:700">${escHtml(r.kategorie)}<span style="opacity:.6;font-weight:400">${r.gewichtung}%</span></span>`).join('')}
+          <span style="font-size:.75rem;color:var(--dim)" data-field="zeiteinschaetzung">${escHtml(karte.zeiteinschaetzung)}</span>
         </div>
       </div>
 
