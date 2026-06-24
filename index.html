@@ -772,6 +772,96 @@
     }
     .ticket-output:focus { background: rgba(124,140,248,.02); }
 
+    /* ── OneNote Table ───────────────────────────────────── */
+    .onenote-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+    }
+    .onenote-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel2);
+    }
+    .onenote-title {
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .onenote-table-wrap {
+      overflow-x: auto;
+      padding: 16px 18px;
+    }
+    .onenote-table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 900px;
+      font-size: .78rem;
+    }
+    .onenote-table th {
+      background: var(--panel2);
+      color: var(--dim);
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      white-space: nowrap;
+      text-align: left;
+    }
+    .onenote-table td {
+      border: 1px solid var(--border);
+      padding: 0;
+      vertical-align: top;
+      min-width: 80px;
+    }
+    .onenote-cell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .onenote-value {
+      padding: 7px 10px;
+      color: var(--text);
+      font-size: .8rem;
+      line-height: 1.4;
+      flex: 1;
+      min-height: 38px;
+    }
+    .onenote-value.empty { color: var(--dim); font-style: italic; }
+    .onenote-copy-cell {
+      border-top: 1px solid var(--border);
+      padding: 3px 6px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .onenote-copy-btn {
+      background: transparent;
+      border: none;
+      color: var(--dim);
+      font-size: .65rem;
+      cursor: pointer;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: var(--font-ui);
+      transition: all .12s;
+    }
+    .onenote-copy-btn:hover { color: var(--muted); background: var(--panel2); }
+    .onenote-row-actions {
+      padding: 10px 18px 14px;
+      display: flex;
+      justify-content: flex-end;
+      border-top: 1px solid var(--border);
+    }
+
     .report-actions {
       padding: 12px 18px;
       border-top: 1px solid var(--border);
@@ -1010,6 +1100,53 @@
           <button class="btn btn-primary" id="btn-copy-ticket">📋 Ticket kopieren</button>
           <button class="btn btn-ghost" id="btn-reopen">↩ Fall wieder aufnehmen</button>
           <button class="btn btn-ghost" id="btn-debug-report" style="margin-left:auto;font-size:.72rem;color:var(--dim);border-color:var(--border)" title="Vollständigen Debug-Bericht in Zwischenablage kopieren">🐛 Bericht für Debug</button>
+        </div>
+
+        <!-- OneNote Tabelle -->
+        <div class="onenote-section" id="onenote-section">
+          <div class="onenote-header">
+            <span class="onenote-title">📓 OneNote-Eintrag</span>
+            <span style="font-size:.7rem;color:var(--dim)">Felder einzeln oder als Zeile kopieren → direkt in OneNote einfügen</span>
+          </div>
+          <div class="onenote-table-wrap">
+            <table class="onenote-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Datum</th>
+                  <th>Uhrzeit</th>
+                  <th>Kunde Name AP</th>
+                  <th>Kunde Telefonnummer</th>
+                  <th>Kunde E-Mailadresse</th>
+                  <th>Firma</th>
+                  <th>Supportfall</th>
+                  <th>Weiterleitung (Person/Abteilung)</th>
+                  <th>Ticket-ID/Link</th>
+                  <th>Beschreibung</th>
+                  <th>Bearbeiter</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr id="onenote-row">
+                  <td><div class="onenote-cell"><div class="onenote-value empty">–</div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="nr" title="Kopieren">📋</button></div></div></td>
+                  <td><div class="onenote-cell"><div class="onenote-value" id="on-datum">–</div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="datum" title="Kopieren">📋</button></div></div></td>
+                  <td><div class="onenote-cell"><div class="onenote-value" id="on-uhrzeit">–</div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="uhrzeit" title="Kopieren">📋</button></div></div></td>
+                  <td><div class="onenote-cell"><div class="onenote-value" id="on-name">–</div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="name" title="Kopieren">📋</button></div></div></td>
+                  <td><div class="onenote-cell"><div class="onenote-value" id="on-tel">–</div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="tel" title="Kopieren">📋</button></div></div></td>
+                  <td><div class="onenote-cell"><div class="onenote-value" id="on-email">–</div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="email" title="Kopieren">📋</button></div></div></td>
+                  <td><div class="onenote-cell"><div class="onenote-value" id="on-firma">–</div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="firma" title="Kopieren">📋</button></div></div></td>
+                  <td><div class="onenote-cell"><div class="onenote-value empty"></div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="supportfall" title="Kopieren">📋</button></div></div></td>
+                  <td><div class="onenote-cell"><div class="onenote-value empty"></div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="weiterleitung" title="Kopieren">📋</button></div></div></td>
+                  <td><div class="onenote-cell"><div class="onenote-value empty"></div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="ticketid" title="Kopieren">📋</button></div></div></td>
+                  <td><div class="onenote-cell"><div class="onenote-value empty"></div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="beschreibung" title="Kopieren">📋</button></div></div></td>
+                  <td><div class="onenote-cell"><div class="onenote-value" id="on-bearbeiter">–</div><div class="onenote-copy-cell"><button class="onenote-copy-btn" data-col="bearbeiter" title="Kopieren">📋</button></div></div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="onenote-row-actions">
+            <button class="btn btn-primary" id="btn-copy-onenote-row">📋 Ganze Zeile kopieren</button>
+          </div>
         </div>
       </div>
 
@@ -2012,6 +2149,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     }
 
     document.getElementById('report-section').style.display = '';
+    fillOneNoteTable(sess);
 
     // Lock workspace inputs
     document.getElementById('notes-textarea').disabled = true;
@@ -2585,6 +2723,95 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     if (!sess) return;
     sess.persNotizen = document.getElementById('pers-textarea').value;
     saveSessions();
+  });
+
+  // ── OneNote Table ────────────────────────────────────────
+  function fillOneNoteTable(sess) {
+    const k    = sess.kontakt || {};
+    const name = localStorage.getItem(KEY_NAME) || '';
+
+    // Date/time from first call, fallback to now
+    const anrufe = sess.anrufe || [];
+    const ts = anrufe.length > 0 ? new Date(anrufe[0].start) : new Date();
+    const dd  = String(ts.getDate()).padStart(2,'0');
+    const mm  = String(ts.getMonth()+1).padStart(2,'0');
+    const yy  = ts.getFullYear();
+    const hh  = String(ts.getHours()).padStart(2,'0');
+    const min = String(ts.getMinutes()).padStart(2,'0');
+
+    const datum   = `${dd}.${mm}.${yy}`;
+    const uhrzeit = `${hh}:${min}`;
+
+    // Fill cells
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = val || '';
+      el.classList.toggle('empty', !val);
+    };
+
+    set('on-datum',      datum);
+    set('on-uhrzeit',    uhrzeit);
+    set('on-name',       k.nameAnrufer);
+    set('on-tel',        k.telefon);
+    set('on-email',      k.email);
+    set('on-firma',      k.firma);
+    set('on-bearbeiter', name);
+  }
+
+  function getOneNoteValues() {
+    const fields = [
+      { id: 'nr',          val: '' },
+      { id: 'datum',       el: 'on-datum' },
+      { id: 'uhrzeit',     el: 'on-uhrzeit' },
+      { id: 'name',        el: 'on-name' },
+      { id: 'tel',         el: 'on-tel' },
+      { id: 'email',       el: 'on-email' },
+      { id: 'firma',       el: 'on-firma' },
+      { id: 'supportfall', val: '' },
+      { id: 'weiterleitung', val: '' },
+      { id: 'ticketid',    val: '' },
+      { id: 'beschreibung', val: '' },
+      { id: 'bearbeiter',  el: 'on-bearbeiter' },
+    ];
+    const result = {};
+    fields.forEach(f => {
+      result[f.id] = f.el ? (document.getElementById(f.el)?.textContent || '') : (f.val || '');
+    });
+    return result;
+  }
+
+  // Copy individual cells
+  document.getElementById('onenote-section').addEventListener('click', e => {
+    const btn = e.target.closest('.onenote-copy-btn');
+    if (!btn) return;
+    const col = btn.dataset.col;
+    const vals = getOneNoteValues();
+    const text = vals[col] || '';
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = '✓';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1400);
+    }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
+  });
+
+  // Copy whole row as tab-separated (pastes as table row in OneNote)
+  document.getElementById('btn-copy-onenote-row').addEventListener('click', () => {
+    const v = getOneNoteValues();
+    const row = [
+      v.nr, v.datum, v.uhrzeit, v.name, v.tel,
+      v.email, v.firma, v.supportfall, v.weiterleitung,
+      v.ticketid, v.beschreibung, v.bearbeiter
+    ].join('\t');
+    navigator.clipboard.writeText(row).then(() => {
+      const btn = document.getElementById('btn-copy-onenote-row');
+      const orig = btn.textContent;
+      btn.textContent = '✓ Zeile kopiert – in OneNote einfügen';
+      btn.style.color = 'var(--green)';
+      btn.style.borderColor = 'rgba(74,222,128,.3)';
+      setTimeout(() => { btn.textContent = orig; btn.style.color=''; btn.style.borderColor=''; }, 2200);
+    }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
   });
 
   // ── START ─────────────────────────────────────────────────
