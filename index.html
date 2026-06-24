@@ -2828,7 +2828,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
 
     // Full HTML with doctype + Office namespace – Word/OneNote need this to paste as table
     const htmlRow = `<!DOCTYPE html><html><body><table border="1" style="border-collapse:collapse"><tbody><tr>${
-      filled.map(c => `<td style="padding:4px 8px;min-width:60px">${c}</td>`).join('')
+      filled.map(c => `<td style="padding:4px 8px;white-space:nowrap">${c}</td>`).join('')
     }</tr></tbody></table></body></html>`;
     const plainRow = filled.join('\t');
 
