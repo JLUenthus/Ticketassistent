@@ -775,14 +775,14 @@
     <div class="header-right">
       <button class="api-status" id="api-status-btn">
         <span class="api-dot" id="api-dot"></span>
-        <span id="api-status-label">Nicht verbunden</span>
+        <span id="api-status-label">Nicht verbunden – hier klicken zur Anmeldung</span>
       </button>
       <button class="cache-btn" id="cache-btn">Cache leeren ⌫</button>
     </div>
   </header>
 
   <!-- ── TIMER BAR ──────────────────────────────────────── -->
-  <div class="timer-bar">
+  <div class="timer-bar" style="flex-wrap:wrap;gap:8px">
     <div class="clock" id="clock">--.--.----  --:--:--</div>
     <div class="call-controls" id="call-controls">
       <button class="call-btn call-btn-start" id="btn-call-start">▶ Anruf starten</button>
@@ -790,6 +790,7 @@
       <span class="call-start-label" id="call-start-label" style="display:none"></span>
       <button class="call-btn call-btn-stop" id="btn-call-stop" style="display:none">⏹ Anruf beenden</button>
     </div>
+    <div id="call-history" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:8px"></div>
   </div>
 
   <!-- ── MAIN ───────────────────────────────────────────── -->
@@ -888,6 +889,21 @@
     <div class="modal">
       <div class="modal-title">🔑 Claude API-Key</div>
       <div class="modal-desc">Der Key wird nur lokal im Browser gespeichert (localStorage) und verlässt nie dieses Gerät.</div>
+
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:16px;font-size:.78rem;line-height:1.7;color:var(--muted)">
+        <div style="font-size:.72rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">📖 So findest du deinen API-Key</div>
+        <ol style="padding-left:16px;display:flex;flex-direction:column;gap:4px">
+          <li>Öffne <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent);text-decoration:none">console.anthropic.com</a> und melde dich an</li>
+          <li>Klicke links im Menü auf <strong style="color:var(--text)">API Keys</strong></li>
+          <li>Klicke auf <strong style="color:var(--text)">Create Key</strong> und vergib einen Namen</li>
+          <li>Kopiere den angezeigten Key (beginnt mit <code style="font-family:var(--font-mono);color:var(--accent);font-size:.75rem">sk-ant-</code>)</li>
+          <li>Füge ihn unten ein und klicke <strong style="color:var(--text)">Speichern</strong></li>
+        </ol>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:.72rem;color:var(--dim)">
+          ⚠️ Den Key nur einmal anzeigen – danach nicht mehr einsehbar. Direkt kopieren!
+        </div>
+      </div>
+
       <div class="modal-field">
         <label class="modal-label">API-Key</label>
         <input class="modal-input" id="api-key-input" type="password" placeholder="sk-ant-…" autocomplete="off">
@@ -1040,8 +1056,7 @@
       label: title,
       createdAt: now.toISOString(),
       tabDisplay,
-      anrufStart: null,
-      anrufEnde: null,
+      anrufe: [],
       kontakt: { nameAnrufer: '', firma: '', telefon: '', email: '' },
       notizen: '',
       karten: [],
@@ -1301,40 +1316,67 @@
   }
 
   // ── Call Timer ───────────────────────────────────────────
+  function renderCallHistory(sess) {
+    const hist = document.getElementById('call-history');
+    hist.innerHTML = '';
+    if (!sess || !sess.anrufe || sess.anrufe.length === 0) return;
+    sess.anrufe.forEach((a, idx) => {
+      const start = new Date(a.start);
+      const pill = document.createElement('span');
+      pill.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;background:var(--panel2);border:1px solid var(--border);font-size:.7rem;font-family:var(--font-mono);color:var(--muted);white-space:nowrap';
+      if (a.end) {
+        const end = new Date(a.end);
+        const diff = Math.floor((end - start) / 1000);
+        pill.textContent = `#${idx+1} ${fmtTime(start)}–${fmtTime(end)} (${fmtDuration(diff)})`;
+        pill.style.color = 'var(--dim)';
+      } else {
+        pill.textContent = `#${idx+1} ${fmtTime(start)} – läuft …`;
+        pill.style.color = 'var(--amber)';
+        pill.style.borderColor = 'rgba(251,191,36,.3)';
+      }
+      hist.appendChild(pill);
+    });
+  }
+
   function restoreCallTimerState(sess) {
     stopCallTimer();
-    const startBtn  = document.getElementById('btn-call-start');
-    const stopBtn   = document.getElementById('btn-call-stop');
-    const durEl     = document.getElementById('call-duration');
-    const startLbl  = document.getElementById('call-start-label');
+    const startBtn = document.getElementById('btn-call-start');
+    const stopBtn  = document.getElementById('btn-call-stop');
+    const durEl    = document.getElementById('call-duration');
+    const startLbl = document.getElementById('call-start-label');
 
-    if (sess.anrufStart && !sess.anrufEnde) {
-      // Still running
-      callStartTs = new Date(sess.anrufStart);
+    renderCallHistory(sess);
+
+    const anrufe = sess.anrufe || [];
+    const last = anrufe[anrufe.length - 1];
+
+    if (last && !last.end) {
+      // Active call running
+      callStartTs = new Date(last.start);
       startBtn.style.display = 'none';
       stopBtn.style.display = '';
       durEl.style.display = '';
       startLbl.style.display = '';
       startLbl.textContent = 'Start: ' + fmtTime(callStartTs);
       startCallTick();
-    } else if (sess.anrufStart && sess.anrufEnde) {
-      // Finished
-      callStartTs = new Date(sess.anrufStart);
-      callEndTs   = new Date(sess.anrufEnde);
-      const diff = Math.floor((callEndTs - callStartTs) / 1000);
-      startBtn.style.display = 'none';
-      stopBtn.style.display = 'none';
-      durEl.style.display = '';
-      durEl.textContent = fmtDuration(diff);
-      startLbl.style.display = '';
-      startLbl.textContent = `Start: ${fmtTime(callStartTs)} | Ende: ${fmtTime(callEndTs)}`;
     } else {
-      // Not started
+      // No active call – show start button
       callStartTs = null; callEndTs = null;
       startBtn.style.display = '';
       stopBtn.style.display = 'none';
-      durEl.style.display = 'none';
-      startLbl.style.display = 'none';
+      if (last && last.end) {
+        // Show last finished call info
+        callStartTs = new Date(last.start);
+        callEndTs   = new Date(last.end);
+        const diff  = Math.floor((callEndTs - callStartTs) / 1000);
+        durEl.style.display = '';
+        durEl.textContent = fmtDuration(diff);
+        startLbl.style.display = '';
+        startLbl.textContent = `Letzter: ${fmtTime(callStartTs)}–${fmtTime(callEndTs)}`;
+      } else {
+        durEl.style.display = 'none';
+        startLbl.style.display = 'none';
+      }
     }
   }
 
@@ -1545,7 +1587,8 @@ Zeiteinschätzung als realistischer Stundenrahmen (z.B. "30min", "1–2h", "halb
     // Build ticket text
     const name = localStorage.getItem(KEY_NAME) || '';
     const k = sess.kontakt;
-    const startDt = sess.anrufStart ? fmtDateTime(new Date(sess.anrufStart)) : '–';
+    const anrufeArr = sess.anrufe || [];
+    const startDt = anrufeArr.length > 0 ? fmtDateTime(new Date(anrufeArr[0].start)) : '–';
 
     let caller = k.nameAnrufer ? k.nameAnrufer : 'ein Kunde';
     let lines = [];
@@ -1579,18 +1622,21 @@ Zeiteinschätzung als realistischer Stundenrahmen (z.B. "30min", "1–2h", "halb
     const lastKarte = sess.karten[sess.karten.length - 1] || {};
 
     // Stat block
-    const startDt = sess.anrufStart ? new Date(sess.anrufStart) : null;
-    const endDt   = sess.anrufEnde  ? new Date(sess.anrufEnde)  : null;
+    const anrufe = sess.anrufe || [];
     let dauer = '–';
     let anrufStr = '–';
 
-    if (startDt) {
-      anrufStr = fmtDateTime(startDt);
-      if (endDt) {
-        anrufStr += ' – ' + fmtTime(endDt);
-        const diff = Math.floor((endDt - startDt) / 1000);
-        dauer = fmtDuration(diff);
-      }
+    if (anrufe.length > 0) {
+      const first = new Date(anrufe[0].start);
+      const last  = anrufe[anrufe.length - 1];
+      anrufStr = fmtDateTime(first);
+      if (last.end) anrufStr += ' – ' + fmtTime(new Date(last.end));
+      // Total talk time = sum of all finished rounds
+      const totalSecs = anrufe.reduce((acc, a) => {
+        if (a.end) return acc + Math.floor((new Date(a.end) - new Date(a.start)) / 1000);
+        return acc;
+      }, 0);
+      if (totalSecs > 0) dauer = fmtDuration(totalSecs) + (anrufe.length > 1 ? ` (${anrufe.length} Anrufe)` : '');
     }
 
     document.getElementById('stat-anruf').textContent   = anrufStr;
@@ -1732,8 +1778,8 @@ Zeiteinschätzung als realistischer Stundenrahmen (z.B. "30min", "1–2h", "halb
     const sess = getSession(activeId);
     if (!sess) return;
     callStartTs = new Date();
-    sess.anrufStart = callStartTs.toISOString();
-    sess.anrufEnde = null;
+    if (!sess.anrufe) sess.anrufe = [];
+    sess.anrufe.push({ start: callStartTs.toISOString(), end: null });
     saveSessions();
 
     document.getElementById('btn-call-start').style.display = 'none';
@@ -1742,6 +1788,7 @@ Zeiteinschätzung als realistischer Stundenrahmen (z.B. "30min", "1–2h", "halb
     document.getElementById('call-start-label').style.display = '';
     document.getElementById('call-start-label').textContent = 'Start: ' + fmtTime(callStartTs);
     startCallTick();
+    renderCallHistory(sess);
   });
 
   document.getElementById('btn-call-stop').addEventListener('click', () => {
@@ -1749,14 +1796,18 @@ Zeiteinschätzung als realistischer Stundenrahmen (z.B. "30min", "1–2h", "halb
     if (!sess) return;
     stopCallTimer();
     callEndTs = new Date();
-    sess.anrufEnde = callEndTs.toISOString();
+    const anrufe = sess.anrufe || [];
+    const last = anrufe[anrufe.length - 1];
+    if (last && !last.end) last.end = callEndTs.toISOString();
     saveSessions();
 
     document.getElementById('btn-call-stop').style.display = 'none';
+    document.getElementById('btn-call-start').style.display = '';
     const diff = Math.floor((callEndTs - callStartTs) / 1000);
     document.getElementById('call-duration').textContent = fmtDuration(diff);
     document.getElementById('call-start-label').textContent =
-      `Start: ${fmtTime(callStartTs)} | Ende: ${fmtTime(callEndTs)}`;
+      `Letzter: ${fmtTime(callStartTs)}–${fmtTime(callEndTs)}`;
+    renderCallHistory(sess);
   });
 
   // Copy ticket
