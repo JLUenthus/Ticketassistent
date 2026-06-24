@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f1117">
+  <title>Ticketassistent – enthus GmbH</title>
+  <style>
+    /* ── Design Tokens (support.sheet kompatibel) ─────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0f1117;
+      --panel:       #1a1d2e;
+      --panel2:      #21253a;
+      --border:      #2a2d3e;
+      --border2:     #343860;
+      --text:        #e0e4f0;
+      --muted:       #8890aa;
+      --dim:         #555a70;
+      --accent:      #7c8cf8;
+      --accent2:     #a78bfa;
+      --accent-bg:   rgba(124,140,248,.10);
+      --accent-glow: rgba(124,140,248,.20);
+      --green:       #4ade80;
+      --green-bg:    rgba(74,222,128,.08);
+      --amber:       #fbbf24;
+      --amber-bg:    rgba(251,191,36,.08);
+      --red:         #f87171;
+      --red-bg:      rgba(248,113,113,.08);
+      --teal:        #2dd4bf;
+      --font-ui:     system-ui, 'Segoe UI', sans-serif;
+      --font-mono:   'Consolas', 'JetBrains Mono', monospace;
+      --r:           10px;
+      --r-lg:        14px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      font-size: .875rem;
+      min-height: 100vh;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(124,140,248,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124,140,248,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── HEADER ───────────────────────────────────────────── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15,17,23,.95);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    /* Logo */
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      text-decoration: none;
+    }
+    .logo-icon {
+      width: 28px; height: 28px;
+      background: var(--accent-bg);
+      border: 1px solid var(--border2);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+    .logo-text { font-size: .92rem; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
+    .logo-text span { color: var(--accent); }
+
+    /* Eigener Name */
+    #own-name-input {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 4px 10px;
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: .78rem;
+      outline: none;
+      width: 160px;
+      transition: border-color .15s;
+      flex-shrink: 0;
+    }
+    #own-name-input:focus { border-color: var(--accent); }
+    #own-name-input::placeholder { color: var(--dim); }
+
+    /* Tab-Leiste */
+    .tab-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+      overflow-x: auto;
+      scrollbar-width: none;
+      min-width: 0;
+    }
+    .tab-bar::-webkit-scrollbar { display: none; }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all .15s;
+      max-width: 220px;
+    }
+    .tab:hover { border-color: var(--border2); color: var(--text); }
+    .tab.active { background: var(--accent-bg); border-color: rgba(124,140,248,.5); color: var(--accent); }
+    .tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tab-close {
+      opacity: 0;
+      font-size: .7rem;
+      color: var(--dim);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+      flex-shrink: 0;
+      transition: all .1s;
+    }
+    .tab:hover .tab-close { opacity: 1; }
+    .tab-close:hover { color: var(--red); }
+
+    .tab-add {
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px dashed var(--border2);
+      background: transparent;
+      color: var(--muted);
+      font-size: .8rem;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all .15s;
+    }
+    .tab-add:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* API + Cache rechts */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .api-status {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--dim);
+      font-size: .72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .api-status:hover { border-color: var(--border2); color: var(--muted); }
+    .api-status.connected { border-color: rgba(74,222,128,.3); color: var(--green); }
+    .api-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--dim);
+      flex-shrink: 0;
+      transition: background .15s;
+    }
+    .api-status.connected .api-dot { background: var(--green); }
+
+    .cache-btn {
+      padding: 4px 10px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--dim);
+      font-size: .72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .cache-btn:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── TIMER BAR ────────────────────────────────────────── */
+    .timer-bar {
+      position: relative;
+      z-index: 1;
+      background: rgba(26,29,46,.8);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-family: var(--font-mono);
+      flex-shrink: 0;
+    }
+
+    .clock {
+      font-size: .9rem;
+      color: var(--muted);
+      letter-spacing: .05em;
+      min-width: 180px;
+    }
+
+    .call-controls { display: flex; align-items: center; gap: 10px; }
+
+    .call-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 14px;
+      border-radius: 8px;
+      border: 1px solid;
+      font-family: var(--font-ui);
+      font-size: .78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .call-btn-start {
+      background: var(--green-bg);
+      border-color: rgba(74,222,128,.4);
+      color: var(--green);
+    }
+    .call-btn-start:hover { background: rgba(74,222,128,.15); }
+    .call-btn-stop {
+      background: var(--red-bg);
+      border-color: rgba(248,113,113,.4);
+      color: var(--red);
+    }
+    .call-btn-stop:hover { background: rgba(248,113,113,.15); }
+
+    .call-duration {
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--amber);
+      letter-spacing: .08em;
+      min-width: 72px;
+    }
+
+    .call-start-label {
+      font-size: .72rem;
+      color: var(--dim);
+    }
+
+    /* ── MAIN CONTENT ─────────────────────────────────────── */
+    main {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 16px 20px 24px;
+      max-width: 1600px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ── EMPTY STATE ─────────────────────────────────────── */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      color: var(--dim);
+      text-align: center;
+      padding: 60px 20px;
+    }
+    .empty-state-icon { font-size: 3rem; opacity: .4; }
+    .empty-state h2 { font-size: 1.1rem; color: var(--muted); font-weight: 600; }
+    .empty-state p { font-size: .82rem; max-width: 320px; }
+    .empty-state-btn {
+      margin-top: 8px;
+      padding: 10px 24px;
+      border-radius: 9px;
+      border: 1px solid rgba(124,140,248,.4);
+      background: var(--accent-bg);
+      color: var(--accent);
+      font-family: var(--font-ui);
+      font-size: .85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .empty-state-btn:hover { background: rgba(124,140,248,.18); }
+
+    /* ── SESSION CONTENT ──────────────────────────────────── */
+    .session-content { display: flex; flex-direction: column; gap: 16px; flex: 1; }
+
+    /* Kontaktdaten */
+    .contact-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+    }
+    .contact-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: var(--font-ui);
+      font-size: .78rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      transition: color .15s;
+    }
+    .contact-toggle:hover { color: var(--text); }
+    .contact-toggle-arrow { transition: transform .2s; color: var(--dim); font-size: .7rem; }
+    .contact-toggle.open .contact-toggle-arrow { transform: rotate(90deg); }
+    .contact-fields {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 0 16px 14px;
+    }
+    .contact-fields.hidden { display: none; }
+    .field-group { display: flex; flex-direction: column; gap: 4px; }
+    .field-label {
+      font-size: .68rem;
+      font-weight: 700;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .field-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 7px 10px;
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: .82rem;
+      outline: none;
+      transition: border-color .15s;
+      width: 100%;
+    }
+    .field-input:focus { border-color: var(--accent); }
+    .field-input::placeholder { color: var(--dim); }
+
+    /* ── CARD WORKSPACE ───────────────────────────────────── */
+    .workspace {
+      display: flex;
+      gap: 0;
+      align-items: flex-start;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      flex: 1;
+      min-height: 420px;
+    }
+    .workspace::-webkit-scrollbar { height: 6px; }
+    .workspace::-webkit-scrollbar-track { background: var(--bg); }
+    .workspace::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    /* Arrow between cards */
+    .card-arrow {
+      display: flex;
+      align-items: center;
+      padding: 0 6px;
+      color: var(--border2);
+      font-size: 1.2rem;
+      align-self: center;
+      flex-shrink: 0;
+      margin-top: -40px;
+    }
+
+    /* Notizen-Karte */
+    .notes-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      display: flex;
+      flex-direction: column;
+      width: 340px;
+      min-width: 340px;
+      flex-shrink: 0;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-header-icon { font-size: 1rem; }
+    .card-header-title { font-size: .82rem; font-weight: 700; color: var(--text); flex: 1; }
+    .card-header-meta { font-size: .68rem; color: var(--dim); font-family: var(--font-mono); }
+
+    .notes-textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 12px 14px;
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: .83rem;
+      line-height: 1.6;
+      resize: none;
+      min-height: 300px;
+    }
+    .notes-textarea::placeholder { color: var(--dim); }
+
+    .card-footer {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    /* KI-Karte */
+    .ai-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      display: flex;
+      flex-direction: column;
+      width: 360px;
+      min-width: 360px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .ai-card.locked { opacity: .75; }
+    .ai-card.locked::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--r-lg);
+      background: rgba(15,17,23,.25);
+      pointer-events: none;
+    }
+
+    .ai-section {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ai-section:last-of-type { border-bottom: none; }
+    .ai-section-label {
+      font-size: .68rem;
+      font-weight: 700;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .ai-content {
+      font-size: .82rem;
+      color: var(--text);
+      line-height: 1.55;
+      white-space: pre-wrap;
+      outline: none;
+      min-height: 32px;
+    }
+    .ai-content[contenteditable="true"]:focus {
+      background: rgba(124,140,248,.04);
+      border-radius: 5px;
+    }
+    .ai-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+    .ai-list li {
+      font-size: .8rem;
+      color: var(--muted);
+      padding: 4px 8px;
+      background: var(--panel2);
+      border-radius: 6px;
+      border-left: 2px solid var(--amber);
+      line-height: 1.4;
+    }
+
+    .prio-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 5px;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+    .prio-Kritisch { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+    .prio-Hoch     { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
+    .prio-Mittel   { background: var(--accent-bg); color: var(--accent); border: 1px solid rgba(124,140,248,.3); }
+    .prio-Niedrig  { background: var(--green-bg); color: var(--green); border: 1px solid rgba(74,222,128,.3); }
+
+    .ai-loading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 24px 14px;
+      color: var(--muted);
+      font-size: .82rem;
+    }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .ai-input-area {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ai-input-area textarea {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 8px 10px;
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: .8rem;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+      transition: border-color .15s;
+      min-height: 60px;
+    }
+    .ai-input-area textarea:focus { border-color: var(--accent); }
+    .ai-input-area textarea::placeholder { color: var(--dim); }
+
+    .ai-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-family: var(--font-ui);
+      font-size: .78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .15s;
+      border: 1px solid;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--accent-bg);
+      border-color: rgba(124,140,248,.4);
+      color: var(--accent);
+    }
+    .btn-primary:hover { background: rgba(124,140,248,.18); }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+
+    .btn-green {
+      background: var(--green-bg);
+      border-color: rgba(74,222,128,.35);
+      color: var(--green);
+    }
+    .btn-green:hover { background: rgba(74,222,128,.15); }
+
+    .btn-amber {
+      background: var(--amber-bg);
+      border-color: rgba(251,191,36,.35);
+      color: var(--amber);
+    }
+    .btn-amber:hover { background: rgba(251,191,36,.15); }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--muted);
+    }
+    .btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+
+    .btn-red {
+      background: var(--red-bg);
+      border-color: rgba(248,113,113,.35);
+      color: var(--red);
+    }
+    .btn-red:hover { background: rgba(248,113,113,.15); }
+
+    /* ── REPORT SECTION ───────────────────────────────────── */
+    .report-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+    }
+
+    .stat-block {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      background: var(--panel2);
+    }
+    .stat-item { display: flex; flex-direction: column; gap: 2px; }
+    .stat-label { font-size: .65rem; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+    .stat-value { font-size: .88rem; font-weight: 700; color: var(--text); font-family: var(--font-mono); }
+    .stat-copy-btn {
+      margin-left: auto;
+      padding: 5px 12px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--dim);
+      font-size: .72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .stat-copy-btn:hover { border-color: var(--border2); color: var(--muted); }
+
+    .ticket-output {
+      padding: 16px 18px;
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      color: var(--text);
+      line-height: 1.7;
+      white-space: pre-wrap;
+      outline: none;
+      min-height: 120px;
+    }
+    .ticket-output:focus { background: rgba(124,140,248,.02); }
+
+    .report-actions {
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    /* ── MODALS ───────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.6);
+      z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      transition: opacity .2s;
+      pointer-events: none;
+    }
+    .modal-overlay.visible { opacity: 1; pointer-events: all; }
+
+    .modal {
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      border-radius: var(--r-lg);
+      padding: 24px;
+      width: 100%;
+      max-width: 420px;
+      transform: translateY(8px) scale(.97);
+      transition: transform .2s;
+    }
+    .modal-overlay.visible .modal { transform: translateY(0) scale(1); }
+
+    .modal-title { font-size: .95rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .modal-desc { font-size: .78rem; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+    .modal-warning { color: var(--red); }
+
+    .modal-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+    .modal-label { font-size: .72rem; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: .05em; }
+    .modal-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 9px 12px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      outline: none;
+      transition: border-color .15s;
+      width: 100%;
+    }
+    .modal-input:focus { border-color: var(--accent); }
+
+    .modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+    /* ── TOAST ────────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      padding: 10px 18px;
+      border-radius: 9px;
+      font-size: .82rem; font-weight: 600;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(8px) scale(.95);
+      transition: opacity .2s, transform .2s;
+      z-index: 300;
+    }
+    .toast.visible { opacity: 1; transform: translateY(0) scale(1); }
+    .toast.success { background: var(--panel); border: 1px solid rgba(74,222,128,.3); color: var(--green); }
+    .toast.error   { background: var(--panel); border: 1px solid rgba(248,113,113,.3); color: var(--red); }
+
+    /* ── NEW TAB MODAL (inline) ───────────────────────────── */
+    #new-tab-modal .modal-input { font-family: var(--font-ui); }
+
+    /* Tab inline edit */
+    .tab-label-edit {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: inherit;
+      font: inherit;
+      width: 100%;
+      min-width: 60px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── HEADER ─────────────────────────────────────────── -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🎫</div>
+      <div class="logo-text">Ticket<span>assistent</span></div>
+    </div>
+
+    <input type="text" id="own-name-input" placeholder="Dein Name (optional)" autocomplete="off">
+
+    <div class="tab-bar" id="tab-bar">
+      <button class="tab-add" id="btn-new-tab" title="Neues Gespräch">＋ Neues Gespräch</button>
+    </div>
+
+    <div class="header-right">
+      <button class="api-status" id="api-status-btn">
+        <span class="api-dot" id="api-dot"></span>
+        <span id="api-status-label">Nicht verbunden</span>
+      </button>
+      <button class="cache-btn" id="cache-btn">Cache leeren ⌫</button>
+    </div>
+  </header>
+
+  <!-- ── TIMER BAR ──────────────────────────────────────── -->
+  <div class="timer-bar">
+    <div class="clock" id="clock">--.--.----  --:--:--</div>
+    <div class="call-controls" id="call-controls">
+      <button class="call-btn call-btn-start" id="btn-call-start">▶ Anruf starten</button>
+      <span class="call-duration" id="call-duration" style="display:none">00:00:00</span>
+      <span class="call-start-label" id="call-start-label" style="display:none"></span>
+      <button class="call-btn call-btn-stop" id="btn-call-stop" style="display:none">⏹ Anruf beenden</button>
+    </div>
+  </div>
+
+  <!-- ── MAIN ───────────────────────────────────────────── -->
+  <main id="main-content">
+    <!-- Leer-Zustand -->
+    <div class="empty-state" id="empty-state">
+      <div class="empty-state-icon">🎫</div>
+      <h2>Kein Gespräch geöffnet</h2>
+      <p>Starte ein neues Gespräch mit dem + Button oben, um loszulegen.</p>
+      <button class="empty-state-btn" id="btn-new-tab-empty">＋ Neues Gespräch starten</button>
+    </div>
+
+    <!-- Session-Inhalt (wird dynamisch befüllt) -->
+    <div class="session-content" id="session-content" style="display:none">
+
+      <!-- Kontaktdaten -->
+      <div class="contact-section">
+        <button class="contact-toggle" id="contact-toggle">
+          <span class="contact-toggle-arrow">▶</span>
+          <span>📋 Kontaktdaten (optional, werden nicht an KI gesendet)</span>
+        </button>
+        <div class="contact-fields hidden" id="contact-fields">
+          <div class="field-group">
+            <label class="field-label">Name Anrufer</label>
+            <input class="field-input" id="f-name" type="text" placeholder="Max Mustermann" autocomplete="off">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Firma</label>
+            <input class="field-input" id="f-firma" type="text" placeholder="Musterfirma GmbH" autocomplete="off">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Telefonnummer</label>
+            <input class="field-input" id="f-tel" type="tel" placeholder="+49 …" autocomplete="off">
+          </div>
+          <div class="field-group">
+            <label class="field-label">E-Mail</label>
+            <input class="field-input" id="f-email" type="email" placeholder="max@firma.de" autocomplete="off">
+          </div>
+        </div>
+      </div>
+
+      <!-- Workspace: Karten horizontal -->
+      <div class="workspace" id="workspace">
+        <!-- Notizen-Karte -->
+        <div class="notes-card" id="notes-card">
+          <div class="card-header">
+            <span class="card-header-icon">📝</span>
+            <span class="card-header-title">Notizen</span>
+          </div>
+          <textarea class="notes-textarea" id="notes-textarea"
+            placeholder="Einfach losschreiben – Stichworte, Fehlercodes, Symptome …&#10;&#10;z.B.: Exchange DAG, Node 2 down, Dienste disabled nach KB5094139, Node 1 OK"></textarea>
+          <div class="card-footer">
+            <button class="btn btn-primary" id="btn-transfer-initial">Übertragen ▶</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Report -->
+      <div class="report-section" id="report-section" style="display:none">
+        <!-- Stat Block -->
+        <div class="stat-block" id="stat-block">
+          <div class="stat-item">
+            <span class="stat-label">Anruf</span>
+            <span class="stat-value" id="stat-anruf">–</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Dauer</span>
+            <span class="stat-value" id="stat-dauer">–</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Priorität</span>
+            <span class="stat-value" id="stat-prio">–</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Zeitaufwand</span>
+            <span class="stat-value" id="stat-aufwand">–</span>
+          </div>
+          <button class="stat-copy-btn" id="btn-copy-stat">📊 Statistik kopieren</button>
+        </div>
+
+        <!-- Ticket Output -->
+        <div class="ticket-output" id="ticket-output" contenteditable="true" spellcheck="false"></div>
+
+        <!-- Actions -->
+        <div class="report-actions">
+          <button class="btn btn-primary" id="btn-copy-ticket">📋 Ticket kopieren</button>
+          <button class="btn btn-ghost" id="btn-reopen">↩ Fall wieder aufnehmen</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ── MODAL: API Key ──────────────────────────────────── -->
+  <div class="modal-overlay" id="api-modal">
+    <div class="modal">
+      <div class="modal-title">🔑 Claude API-Key</div>
+      <div class="modal-desc">Der Key wird nur lokal im Browser gespeichert (localStorage) und verlässt nie dieses Gerät.</div>
+      <div class="modal-field">
+        <label class="modal-label">API-Key</label>
+        <input class="modal-input" id="api-key-input" type="password" placeholder="sk-ant-…" autocomplete="off">
+      </div>
+      <div class="modal-btns">
+        <button class="btn btn-ghost" id="api-modal-cancel">Abbrechen</button>
+        <button class="btn btn-primary" id="api-modal-save">Speichern & Verbinden</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL: Neuer Tab ────────────────────────────────── -->
+  <div class="modal-overlay" id="new-tab-modal">
+    <div class="modal">
+      <div class="modal-title">➕ Neues Gespräch</div>
+      <div class="modal-desc">Gib dem Gespräch einen kurzen Titel. Das Tab-Label wird automatisch um Datum und Uhrzeit ergänzt.</div>
+      <div class="modal-field">
+        <label class="modal-label">Titel</label>
+        <input class="modal-input" id="new-tab-title-input" type="text" placeholder="z. B. Exchange DAG, Teams Problem, VPN Fehler …" autocomplete="off">
+      </div>
+      <div class="modal-btns">
+        <button class="btn btn-ghost" id="new-tab-cancel">Abbrechen</button>
+        <button class="btn btn-primary" id="new-tab-confirm">Gespräch starten</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL: Cache leeren ────────────────────────────── -->
+  <div class="modal-overlay" id="cache-modal">
+    <div class="modal">
+      <div class="modal-title">⚠️ Cache leeren</div>
+      <div class="modal-desc modal-warning">Alle Gespräche, der API-Key und dein Name werden unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.</div>
+      <div class="modal-btns">
+        <button class="btn btn-ghost" id="cache-modal-cancel">Abbrechen</button>
+        <button class="btn btn-red" id="cache-modal-confirm">Ja, alles löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TOAST ──────────────────────────────────────────── -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+  // ─────────────────────────────────────────────────────────
+  // TICKETASSISTENT – Core JS
+  // ─────────────────────────────────────────────────────────
+
+  // ── Storage Keys ────────────────────────────────────────
+  const KEY_API    = 'ta_apiKey';
+  const KEY_NAME   = 'ta_eigenerName';
+  const KEY_SESS   = 'ta_sessions';
+  const KEY_ACTIVE = 'ta_activeTab';
+  const MAX_SESSIONS = 20;
+
+  // ── State ────────────────────────────────────────────────
+  let sessions   = [];
+  let activeId   = null;
+  let callTimer  = null;
+  let callStartTs = null;
+  let callEndTs   = null;
+  let clockTimer  = null;
+
+  // ── Init ─────────────────────────────────────────────────
+  function init() {
+    // Load persisted data
+    sessions = JSON.parse(localStorage.getItem(KEY_SESS) || '[]');
+    activeId = localStorage.getItem(KEY_ACTIVE) || null;
+
+    // Own name
+    const storedName = localStorage.getItem(KEY_NAME) || '';
+    document.getElementById('own-name-input').value = storedName;
+
+    // API status
+    updateApiStatus();
+
+    // Render tabs
+    renderTabs();
+
+    // Activate last active tab or show empty
+    if (activeId && sessions.find(s => s.id === activeId)) {
+      activateSession(activeId);
+    } else if (sessions.length > 0) {
+      activateSession(sessions[sessions.length - 1].id);
+    } else {
+      showEmpty();
+    }
+
+    // Start clock
+    updateClock();
+    clockTimer = setInterval(updateClock, 1000);
+  }
+
+  // ── Clock ─────────────────────────────────────────────────
+  function updateClock() {
+    const now = new Date();
+    const d = String(now.getDate()).padStart(2,'0');
+    const m = String(now.getMonth()+1).padStart(2,'0');
+    const y = now.getFullYear();
+    const h = String(now.getHours()).padStart(2,'0');
+    const min = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    document.getElementById('clock').textContent = `${d}.${m}.${y}  ${h}:${min}:${s}`;
+  }
+
+  // ── Toast ────────────────────────────────────────────────
+  let toastTimer = null;
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast ${type} visible`;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.classList.remove('visible'); }, 2500);
+  }
+
+  // ── API Status ───────────────────────────────────────────
+  function updateApiStatus() {
+    const key = localStorage.getItem(KEY_API);
+    const btn = document.getElementById('api-status-btn');
+    const lbl = document.getElementById('api-status-label');
+    if (key && key.length > 10) {
+      btn.classList.add('connected');
+      lbl.textContent = 'Verbunden';
+    } else {
+      btn.classList.remove('connected');
+      lbl.textContent = 'Nicht verbunden';
+    }
+  }
+
+  // ── Sessions ─────────────────────────────────────────────
+  function saveSessions() {
+    localStorage.setItem(KEY_SESS, JSON.stringify(sessions));
+    localStorage.setItem(KEY_ACTIVE, activeId || '');
+  }
+
+  function getSession(id) {
+    return sessions.find(s => s.id === id);
+  }
+
+  function createSession(title) {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2,'0');
+    const mm = String(now.getMonth()+1).padStart(2,'0');
+    const hh = String(now.getHours()).padStart(2,'0');
+    const min = String(now.getMinutes()).padStart(2,'0');
+    const id = 'session_' + now.getTime();
+    const tabDisplay = `${dd}.${mm}. ${hh}:${min} – ${title}`;
+
+    const sess = {
+      id,
+      label: title,
+      createdAt: now.toISOString(),
+      tabDisplay,
+      anrufStart: null,
+      anrufEnde: null,
+      kontakt: { nameAnrufer: '', firma: '', telefon: '', email: '' },
+      notizen: '',
+      karten: [],
+      ticketText: '',
+      abgeschlossen: false
+    };
+
+    sessions.push(sess);
+    if (sessions.length > MAX_SESSIONS) sessions.shift();
+    saveSessions();
+    return sess;
+  }
+
+  function deleteSession(id) {
+    sessions = sessions.filter(s => s.id !== id);
+    if (activeId === id) {
+      activeId = sessions.length > 0 ? sessions[sessions.length - 1].id : null;
+    }
+    saveSessions();
+    renderTabs();
+    if (activeId) {
+      activateSession(activeId);
+    } else {
+      showEmpty();
+    }
+  }
+
+  // ── Tabs ─────────────────────────────────────────────────
+  function renderTabs() {
+    const bar = document.getElementById('tab-bar');
+    // Remove old tabs (keep the + button)
+    bar.querySelectorAll('.tab').forEach(t => t.remove());
+
+    const addBtn = document.getElementById('btn-new-tab');
+
+    sessions.forEach(sess => {
+      const tab = document.createElement('div');
+      tab.className = 'tab' + (sess.id === activeId ? ' active' : '');
+      tab.dataset.id = sess.id;
+
+      const label = document.createElement('span');
+      label.className = 'tab-label';
+      label.textContent = sess.tabDisplay;
+      label.title = sess.tabDisplay;
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'tab-close';
+      closeBtn.textContent = '×';
+      closeBtn.title = 'Gespräch schließen';
+
+      tab.appendChild(label);
+      tab.appendChild(closeBtn);
+      bar.insertBefore(tab, addBtn);
+
+      // Click → activate
+      tab.addEventListener('click', (e) => {
+        if (e.target === closeBtn) return;
+        activateSession(sess.id);
+      });
+
+      // Doppelklick → rename
+      label.addEventListener('dblclick', () => startInlineRename(label, sess));
+
+      // Close
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteSession(sess.id);
+      });
+    });
+  }
+
+  function startInlineRename(labelEl, sess) {
+    const input = document.createElement('input');
+    input.className = 'tab-label-edit';
+    input.value = sess.label;
+    labelEl.textContent = '';
+    labelEl.appendChild(input);
+    input.focus();
+    input.select();
+
+    function finish() {
+      const newTitle = input.value.trim() || sess.label;
+      sess.label = newTitle;
+      // Rebuild tabDisplay keeping original date prefix
+      const orig = sess.tabDisplay;
+      const dashIdx = orig.indexOf(' – ');
+      const prefix = dashIdx !== -1 ? orig.substring(0, dashIdx) : orig;
+      sess.tabDisplay = prefix + ' – ' + newTitle;
+      labelEl.textContent = sess.tabDisplay;
+      labelEl.title = sess.tabDisplay;
+      saveSessions();
+    }
+
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      if (e.key === 'Escape') { input.value = sess.label; input.blur(); }
+    });
+  }
+
+  // ── Activate Session ─────────────────────────────────────
+  function activateSession(id) {
+    activeId = id;
+    localStorage.setItem(KEY_ACTIVE, id);
+
+    // Update tab highlight
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.id === id);
+    });
+
+    showSessionContent();
+    renderSession();
+  }
+
+  function showEmpty() {
+    document.getElementById('empty-state').style.display = '';
+    document.getElementById('session-content').style.display = 'none';
+    stopCallTimer();
+  }
+
+  function showSessionContent() {
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('session-content').style.display = '';
+  }
+
+  // ── Render current session ───────────────────────────────
+  function renderSession() {
+    const sess = getSession(activeId);
+    if (!sess) { showEmpty(); return; }
+
+    // Contact fields
+    document.getElementById('f-name').value  = sess.kontakt.nameAnrufer || '';
+    document.getElementById('f-firma').value = sess.kontakt.firma || '';
+    document.getElementById('f-tel').value   = sess.kontakt.telefon || '';
+    document.getElementById('f-email').value = sess.kontakt.email || '';
+
+    // Notes
+    document.getElementById('notes-textarea').value = sess.notizen || '';
+
+    // Workspace: rebuild KI cards
+    buildWorkspace(sess);
+
+    // Report
+    if (sess.abgeschlossen && sess.ticketText) {
+      showReport(sess);
+    } else {
+      document.getElementById('report-section').style.display = 'none';
+    }
+
+    // Call timer state
+    restoreCallTimerState(sess);
+  }
+
+  // ── Build Workspace (cards) ──────────────────────────────
+  function buildWorkspace(sess) {
+    const ws = document.getElementById('workspace');
+    // Remove all AI cards and arrows
+    ws.querySelectorAll('.ai-card, .card-arrow').forEach(el => el.remove());
+
+    sess.karten.forEach((karte, idx) => {
+      const isLast = idx === sess.karten.length - 1 && !sess.abgeschlossen;
+      appendAiCard(karte, !isLast);
+    });
+
+    // If session is locked, disable notes
+    const notesTA = document.getElementById('notes-textarea');
+    const transferBtn = document.getElementById('btn-transfer-initial');
+    if (sess.abgeschlossen) {
+      notesTA.disabled = true;
+      transferBtn.disabled = true;
+    } else {
+      notesTA.disabled = false;
+      transferBtn.disabled = false;
+    }
+  }
+
+  function appendAiCard(karte, locked) {
+    const ws = document.getElementById('workspace');
+
+    // Arrow
+    const arrow = document.createElement('div');
+    arrow.className = 'card-arrow';
+    arrow.textContent = '▶';
+    ws.appendChild(arrow);
+
+    const card = document.createElement('div');
+    card.className = 'ai-card' + (locked ? ' locked' : '');
+    card.dataset.karteId = karte.id;
+
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-header-icon">🤖</span>
+        <span class="card-header-title">KI-Auswertung #${karte.id}</span>
+        <span class="card-header-meta">${karte.timestamp}</span>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-label">📋 Zusammenfassung</div>
+        <div class="ai-content" contenteditable="${locked ? 'false' : 'true'}"
+             data-field="zusammenfassung">${escHtml(karte.zusammenfassung)}</div>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-label">❓ Noch benötigte Infos</div>
+        <ul class="ai-list" data-field="offeneInfos">
+          ${(karte.offeneInfos || []).map(i => `<li>${escHtml(i)}</li>`).join('')}
+        </ul>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-label">⚡ Vorabbewertung</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <span class="prio-badge prio-${karte.prio}" data-field="prioBadge">${escHtml(karte.prio)}</span>
+          <span style="font-size:.78rem;color:var(--muted)" data-field="zeiteinschaetzung">${escHtml(karte.zeiteinschaetzung)}</span>
+        </div>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-label">💥 Auswirkung</div>
+        <div class="ai-content" contenteditable="${locked ? 'false' : 'true'}"
+             data-field="auswirkung">${escHtml(karte.auswirkung)}</div>
+      </div>
+
+      ${!locked ? `
+      <div class="ai-input-area">
+        <textarea placeholder="Ergänzungen / Antworten auf die Rückfragen …" rows="3"></textarea>
+        <div class="ai-actions">
+          <button class="btn btn-green btn-finalize">📄 Abschlussbericht anfertigen</button>
+          <button class="btn btn-primary btn-transfer-ai">Übertragen ▶</button>
+        </div>
+      </div>` : ''}
+    `;
+
+    // Bind events for active card
+    if (!locked) {
+      card.querySelector('.btn-transfer-ai').addEventListener('click', () => {
+        const extra = card.querySelector('textarea').value.trim();
+        transferFromAiCard(karte, extra);
+      });
+      card.querySelector('.btn-finalize').addEventListener('click', () => {
+        finalizeReport();
+      });
+    }
+
+    ws.appendChild(card);
+
+    // Scroll to end
+    requestAnimationFrame(() => { ws.scrollLeft = ws.scrollWidth; });
+  }
+
+  function escHtml(str = '') {
+    return String(str)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  // ── Call Timer ───────────────────────────────────────────
+  function restoreCallTimerState(sess) {
+    stopCallTimer();
+    const startBtn  = document.getElementById('btn-call-start');
+    const stopBtn   = document.getElementById('btn-call-stop');
+    const durEl     = document.getElementById('call-duration');
+    const startLbl  = document.getElementById('call-start-label');
+
+    if (sess.anrufStart && !sess.anrufEnde) {
+      // Still running
+      callStartTs = new Date(sess.anrufStart);
+      startBtn.style.display = 'none';
+      stopBtn.style.display = '';
+      durEl.style.display = '';
+      startLbl.style.display = '';
+      startLbl.textContent = 'Start: ' + fmtTime(callStartTs);
+      startCallTick();
+    } else if (sess.anrufStart && sess.anrufEnde) {
+      // Finished
+      callStartTs = new Date(sess.anrufStart);
+      callEndTs   = new Date(sess.anrufEnde);
+      const diff = Math.floor((callEndTs - callStartTs) / 1000);
+      startBtn.style.display = 'none';
+      stopBtn.style.display = 'none';
+      durEl.style.display = '';
+      durEl.textContent = fmtDuration(diff);
+      startLbl.style.display = '';
+      startLbl.textContent = `Start: ${fmtTime(callStartTs)} | Ende: ${fmtTime(callEndTs)}`;
+    } else {
+      // Not started
+      callStartTs = null; callEndTs = null;
+      startBtn.style.display = '';
+      stopBtn.style.display = 'none';
+      durEl.style.display = 'none';
+      startLbl.style.display = 'none';
+    }
+  }
+
+  function startCallTick() {
+    stopCallTimer();
+    const durEl = document.getElementById('call-duration');
+    callTimer = setInterval(() => {
+      const diff = Math.floor((Date.now() - callStartTs) / 1000);
+      durEl.textContent = fmtDuration(diff);
+    }, 1000);
+  }
+
+  function stopCallTimer() {
+    if (callTimer) { clearInterval(callTimer); callTimer = null; }
+  }
+
+  function fmtDuration(secs) {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function fmtTime(date) {
+    return `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+  }
+
+  function fmtDateTime(date) {
+    if (!date) return '–';
+    const d = String(date.getDate()).padStart(2,'0');
+    const m = String(date.getMonth()+1).padStart(2,'0');
+    const y = date.getFullYear();
+    const h = String(date.getHours()).padStart(2,'0');
+    const min = String(date.getMinutes()).padStart(2,'0');
+    return `${d}.${m}.${y} ${h}:${min}`;
+  }
+
+  // ── Transfer: Notizen → KI ───────────────────────────────
+  async function transferInitial() {
+    const sess = getSession(activeId);
+    if (!sess) return;
+
+    const notizen = document.getElementById('notes-textarea').value.trim();
+    if (!notizen) { showToast('Bitte zuerst Notizen eingeben.', 'error'); return; }
+
+    // Save notizen
+    sess.notizen = notizen;
+    saveSessions();
+
+    await callClaude(sess, notizen, null);
+  }
+
+  async function transferFromAiCard(karte, extra) {
+    const sess = getSession(activeId);
+    if (!sess) return;
+
+    // Build context from all previous cards + new input
+    const context = buildContext(sess, extra);
+    await callClaude(sess, context, karte);
+  }
+
+  function buildContext(sess, extraInput) {
+    let ctx = `Ursprüngliche Notizen:\n${sess.notizen}\n\n`;
+    sess.karten.forEach(k => {
+      ctx += `--- KI-Auswertung #${k.id} ---\n`;
+      ctx += `Zusammenfassung: ${k.zusammenfassung}\n`;
+      ctx += `Auswirkung: ${k.auswirkung}\n`;
+      ctx += `Prio: ${k.prio} | Zeit: ${k.zeiteinschaetzung}\n\n`;
+    });
+    if (extraInput) ctx += `Neue Ergänzung des Technikers:\n${extraInput}\n`;
+    return ctx;
+  }
+
+  // ── Claude API Call ──────────────────────────────────────
+  async function callClaude(sess, context, fromKarte) {
+    const apiKey = localStorage.getItem(KEY_API);
+    if (!apiKey) {
+      showToast('Kein API-Key gesetzt. Bitte zuerst verbinden.', 'error');
+      openApiModal();
+      return;
+    }
+
+    // Lock previous card if exists
+    const ws = document.getElementById('workspace');
+    const prevActive = ws.querySelector('.ai-card:not(.locked)');
+    if (prevActive) prevActive.classList.add('locked');
+
+    // Show loading card placeholder
+    const arrow = document.createElement('div');
+    arrow.className = 'card-arrow';
+    arrow.textContent = '▶';
+    ws.appendChild(arrow);
+
+    const loadingCard = document.createElement('div');
+    loadingCard.className = 'ai-card';
+    loadingCard.innerHTML = `
+      <div class="card-header">
+        <span class="card-header-icon">🤖</span>
+        <span class="card-header-title">KI analysiert …</span>
+      </div>
+      <div class="ai-loading">
+        <div class="spinner"></div>
+        <span>Claude wertet deine Stichworte aus …</span>
+      </div>`;
+    ws.appendChild(loadingCard);
+    ws.scrollLeft = ws.scrollWidth;
+
+    const systemPrompt = `Du bist ein IT-Support-Assistent für ein IT-Unternehmen.
+Ein Techniker führt ein Telefongespräch und gibt dir technische Stichworte.
+Keine personenbezogenen Daten – nur technische Inhalte.
+
+Antworte IMMER ausschließlich mit diesem JSON-Objekt (kein Markdown, keine Erklärungen):
+{
+  "zusammenfassung": "Kurze, stichwortartige Zusammenfassung des Falles in 2-4 Sätzen.",
+  "offeneInfos": ["Info die noch fehlt: Beschreibung", "Weitere fehlende Info: Beschreibung"],
+  "prio": "Hoch",
+  "prioBegründung": "Kurze Begründung der Priorität.",
+  "zeiteinschaetzung": "1–2h",
+  "auswirkung": "Was ist betroffen und was funktioniert noch."
+}
+
+Prioritätswerte: Niedrig | Mittel | Hoch | Kritisch
+Zeiteinschätzung als realistischer Stundenrahmen (z.B. "30min", "1–2h", "halber Tag").`;
+
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: context }]
+        })
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        throw new Error(data.error?.message || `HTTP ${resp.status}`);
+      }
+
+      const raw = data.content?.[0]?.text || '';
+      let parsed;
+      try {
+        const clean = raw.replace(/```json|```/g, '').trim();
+        parsed = JSON.parse(clean);
+      } catch {
+        throw new Error('KI-Antwort konnte nicht verarbeitet werden. Bitte erneut versuchen.');
+      }
+
+      // Remove loading card & arrow
+      loadingCard.remove();
+      arrow.remove();
+
+      // Create karte
+      const now = new Date();
+      const karte = {
+        id: sess.karten.length + 1,
+        timestamp: `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
+        eingabe: context,
+        zusammenfassung: parsed.zusammenfassung || '',
+        offeneInfos: parsed.offeneInfos || [],
+        prio: parsed.prio || 'Mittel',
+        prioBegründung: parsed.prioBegründung || '',
+        zeiteinschaetzung: `${parsed.zeiteinschaetzung || '–'} | ${parsed.prioBegründung || ''}`,
+        auswirkung: parsed.auswirkung || '',
+        editierbar: true
+      };
+
+      sess.karten.push(karte);
+      saveSessions();
+      appendAiCard(karte, false);
+
+    } catch (err) {
+      loadingCard.remove();
+      arrow.remove();
+      // Re-unlock previous card
+      if (prevActive) prevActive.classList.remove('locked');
+      showToast('Fehler: ' + err.message, 'error');
+    }
+  }
+
+  // ── Finalize Report ──────────────────────────────────────
+  function finalizeReport() {
+    const sess = getSession(activeId);
+    if (!sess || sess.karten.length === 0) return;
+
+    const lastKarte = sess.karten[sess.karten.length - 1];
+
+    // Read editable fields from DOM (user may have edited them)
+    const ws = document.getElementById('workspace');
+    const lastCard = ws.querySelector('.ai-card:not(.locked)');
+    if (lastCard) {
+      const zEl = lastCard.querySelector('[data-field="zusammenfassung"]');
+      const aEl = lastCard.querySelector('[data-field="auswirkung"]');
+      if (zEl) lastKarte.zusammenfassung = zEl.innerText;
+      if (aEl) lastKarte.auswirkung = aEl.innerText;
+    }
+
+    sess.abgeschlossen = true;
+
+    // Build ticket text
+    const name = localStorage.getItem(KEY_NAME) || '';
+    const k = sess.kontakt;
+    const startDt = sess.anrufStart ? fmtDateTime(new Date(sess.anrufStart)) : '–';
+
+    let caller = k.nameAnrufer ? k.nameAnrufer : 'ein Kunde';
+    let lines = [];
+
+    lines.push(`Heute, ${startDt} hat ${caller} in der Hotline angerufen und folgendes berichtet:`);
+    lines.push('');
+    lines.push(lastKarte.zusammenfassung);
+    lines.push('');
+    lines.push(`Auswirkung: ${lastKarte.auswirkung}`);
+
+    const contactParts = [k.telefon, k.email].filter(Boolean);
+    if (contactParts.length > 0) {
+      lines.push('');
+      lines.push('Bitte einmal melden unter:');
+      lines.push(contactParts.join(' / '));
+    }
+
+    if (name) {
+      lines.push('');
+      lines.push(`Ticketaufnahme erfolgte von: ${name}`);
+    }
+
+    const ticket = lines.join('\n');
+    sess.ticketText = ticket;
+    saveSessions();
+
+    showReport(sess);
+  }
+
+  function showReport(sess) {
+    const lastKarte = sess.karten[sess.karten.length - 1] || {};
+
+    // Stat block
+    const startDt = sess.anrufStart ? new Date(sess.anrufStart) : null;
+    const endDt   = sess.anrufEnde  ? new Date(sess.anrufEnde)  : null;
+    let dauer = '–';
+    let anrufStr = '–';
+
+    if (startDt) {
+      anrufStr = fmtDateTime(startDt);
+      if (endDt) {
+        anrufStr += ' – ' + fmtTime(endDt);
+        const diff = Math.floor((endDt - startDt) / 1000);
+        dauer = fmtDuration(diff);
+      }
+    }
+
+    document.getElementById('stat-anruf').textContent   = anrufStr;
+    document.getElementById('stat-dauer').textContent   = dauer;
+    document.getElementById('stat-prio').textContent    = lastKarte.prio || '–';
+    document.getElementById('stat-aufwand').textContent = (lastKarte.zeiteinschaetzung || '–').split('|')[0].trim();
+
+    // Ticket output
+    const to = document.getElementById('ticket-output');
+    to.textContent = sess.ticketText || '';
+
+    document.getElementById('report-section').style.display = '';
+
+    // Lock workspace inputs
+    document.getElementById('notes-textarea').disabled = true;
+    document.getElementById('btn-transfer-initial').disabled = true;
+
+    // Scroll down
+    requestAnimationFrame(() => {
+      document.getElementById('report-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  // ── Reopen ───────────────────────────────────────────────
+  function reopenSession() {
+    const sess = getSession(activeId);
+    if (!sess) return;
+    sess.abgeschlossen = false;
+    saveSessions();
+    document.getElementById('report-section').style.display = 'none';
+    document.getElementById('notes-textarea').disabled = false;
+    document.getElementById('btn-transfer-initial').disabled = false;
+    buildWorkspace(sess);
+  }
+
+  // ── Copy helpers ─────────────────────────────────────────
+  function copyText(text, label = 'Kopiert') {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(label + ' ✓');
+    }).catch(() => {
+      showToast('Kopieren fehlgeschlagen', 'error');
+    });
+  }
+
+  // ── Modals ───────────────────────────────────────────────
+  function openModal(id) { document.getElementById(id).classList.add('visible'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('visible'); }
+
+  function openApiModal() { openModal('api-modal'); }
+
+  // ── Event Listeners ──────────────────────────────────────
+  // Own name
+  document.getElementById('own-name-input').addEventListener('input', e => {
+    localStorage.setItem(KEY_NAME, e.target.value.trim());
+  });
+
+  // New tab buttons
+  document.getElementById('btn-new-tab').addEventListener('click', () => openModal('new-tab-modal'));
+  document.getElementById('btn-new-tab-empty').addEventListener('click', () => openModal('new-tab-modal'));
+
+  document.getElementById('new-tab-cancel').addEventListener('click', () => closeModal('new-tab-modal'));
+  document.getElementById('new-tab-confirm').addEventListener('click', () => {
+    const inp = document.getElementById('new-tab-title-input');
+    const title = inp.value.trim() || 'Gespräch';
+    inp.value = '';
+    closeModal('new-tab-modal');
+    const sess = createSession(title);
+    renderTabs();
+    activateSession(sess.id);
+  });
+
+  document.getElementById('new-tab-title-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('new-tab-confirm').click();
+    if (e.key === 'Escape') closeModal('new-tab-modal');
+  });
+
+  // API
+  document.getElementById('api-status-btn').addEventListener('click', openApiModal);
+  document.getElementById('api-modal-cancel').addEventListener('click', () => closeModal('api-modal'));
+  document.getElementById('api-modal-save').addEventListener('click', () => {
+    const key = document.getElementById('api-key-input').value.trim();
+    if (!key) { showToast('Bitte API-Key eingeben', 'error'); return; }
+    localStorage.setItem(KEY_API, key);
+    document.getElementById('api-key-input').value = '';
+    closeModal('api-modal');
+    updateApiStatus();
+    showToast('API-Key gespeichert ✓');
+  });
+
+  // Cache
+  document.getElementById('cache-btn').addEventListener('click', () => openModal('cache-modal'));
+  document.getElementById('cache-modal-cancel').addEventListener('click', () => closeModal('cache-modal'));
+  document.getElementById('cache-modal-confirm').addEventListener('click', () => {
+    localStorage.clear();
+    closeModal('cache-modal');
+    sessions = []; activeId = null;
+    document.getElementById('own-name-input').value = '';
+    stopCallTimer();
+    renderTabs();
+    showEmpty();
+    updateApiStatus();
+    showToast('Cache geleert ✓');
+  });
+
+  // Contact toggle
+  document.getElementById('contact-toggle').addEventListener('click', () => {
+    const toggle = document.getElementById('contact-toggle');
+    const fields = document.getElementById('contact-fields');
+    toggle.classList.toggle('open');
+    fields.classList.toggle('hidden');
+  });
+
+  // Contact field autosave
+  ['f-name','f-firma','f-tel','f-email'].forEach(fid => {
+    document.getElementById(fid).addEventListener('input', () => {
+      const sess = getSession(activeId);
+      if (!sess) return;
+      sess.kontakt.nameAnrufer = document.getElementById('f-name').value;
+      sess.kontakt.firma       = document.getElementById('f-firma').value;
+      sess.kontakt.telefon     = document.getElementById('f-tel').value;
+      sess.kontakt.email       = document.getElementById('f-email').value;
+      saveSessions();
+    });
+  });
+
+  // Notes autosave
+  document.getElementById('notes-textarea').addEventListener('input', () => {
+    const sess = getSession(activeId);
+    if (!sess) return;
+    sess.notizen = document.getElementById('notes-textarea').value;
+    saveSessions();
+  });
+
+  // Transfer initial
+  document.getElementById('btn-transfer-initial').addEventListener('click', transferInitial);
+
+  // Call buttons
+  document.getElementById('btn-call-start').addEventListener('click', () => {
+    const sess = getSession(activeId);
+    if (!sess) return;
+    callStartTs = new Date();
+    sess.anrufStart = callStartTs.toISOString();
+    sess.anrufEnde = null;
+    saveSessions();
+
+    document.getElementById('btn-call-start').style.display = 'none';
+    document.getElementById('btn-call-stop').style.display = '';
+    document.getElementById('call-duration').style.display = '';
+    document.getElementById('call-start-label').style.display = '';
+    document.getElementById('call-start-label').textContent = 'Start: ' + fmtTime(callStartTs);
+    startCallTick();
+  });
+
+  document.getElementById('btn-call-stop').addEventListener('click', () => {
+    const sess = getSession(activeId);
+    if (!sess) return;
+    stopCallTimer();
+    callEndTs = new Date();
+    sess.anrufEnde = callEndTs.toISOString();
+    saveSessions();
+
+    document.getElementById('btn-call-stop').style.display = 'none';
+    const diff = Math.floor((callEndTs - callStartTs) / 1000);
+    document.getElementById('call-duration').textContent = fmtDuration(diff);
+    document.getElementById('call-start-label').textContent =
+      `Start: ${fmtTime(callStartTs)} | Ende: ${fmtTime(callEndTs)}`;
+  });
+
+  // Copy ticket
+  document.getElementById('btn-copy-ticket').addEventListener('click', () => {
+    const text = document.getElementById('ticket-output').innerText;
+    copyText(text, 'Ticket kopiert');
+  });
+
+  // Copy stat
+  document.getElementById('btn-copy-stat').addEventListener('click', () => {
+    const anruf  = document.getElementById('stat-anruf').textContent;
+    const dauer  = document.getElementById('stat-dauer').textContent;
+    const prio   = document.getElementById('stat-prio').textContent;
+    const aufwand = document.getElementById('stat-aufwand').textContent;
+    copyText(`Anruf: ${anruf} | Dauer: ${dauer} | Prio: ${prio} | Zeitaufwand: ${aufwand}`, 'Statistik kopiert');
+  });
+
+  // Reopen
+  document.getElementById('btn-reopen').addEventListener('click', reopenSession);
+
+  // Close modals on overlay click
+  ['api-modal','new-tab-modal','cache-modal'].forEach(id => {
+    document.getElementById(id).addEventListener('click', e => {
+      if (e.target.id === id) closeModal(id);
+    });
+  });
+
+  // ── START ─────────────────────────────────────────────────
+  init();
+  </script>
+</body>
+</html>
