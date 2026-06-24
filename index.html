@@ -2823,9 +2823,14 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       v.ticketid, v.beschreibung, v.bearbeiter
     ];
 
-    // Build HTML table row – OneNote renders this as real table cells
-    const htmlRow = `<table><tbody><tr>${vals.map(c => `<td>${c || ''}</td>`).join('')}</tr></tbody></table>`;
-    const plainRow = vals.join('\t');
+    // Empty cells get spaces so Word/OneNote preserves table structure
+    const filled = vals.map(c => c && c.trim() ? c : '   ');
+
+    // Full HTML with doctype + Office namespace – Word/OneNote need this to paste as table
+    const htmlRow = `<!DOCTYPE html><html><body><table border="1" style="border-collapse:collapse"><tbody><tr>${
+      filled.map(c => `<td style="padding:4px 8px;min-width:60px">${c}</td>`).join('')
+    }</tr></tbody></table></body></html>`;
+    const plainRow = filled.join('\t');
 
     // Write both HTML and plain text to clipboard
     try {
