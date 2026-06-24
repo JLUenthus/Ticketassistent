@@ -956,15 +956,51 @@
 
   <!-- ── MODAL: Manuelle KI-Antwort einfügen ──────────── -->
   <div class="modal-overlay" id="paste-modal">
-    <div class="modal" style="max-width:560px">
+    <div class="modal" style="max-width:600px">
       <div class="modal-title">📋 KI-Antwort einfügen</div>
-      <div class="modal-desc">
-        Der Prompt wurde kopiert. Öffne jetzt <a href="https://claude.ai" target="_blank" style="color:var(--accent);text-decoration:none">claude.ai</a>,
-        starte einen neuen Chat, füge den Prompt ein und kopiere die komplette Antwort hierher.
+
+      <!-- Step indicator -->
+      <div style="display:flex;align-items:center;gap:0;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;background:var(--green-bg);border:1px solid rgba(74,222,128,.3);font-size:.72rem;font-weight:700;color:var(--green)">
+          ✓ Schritt 1: Prompt kopiert
+        </div>
+        <div style="width:24px;height:1px;background:var(--border);flex-shrink:0"></div>
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);font-size:.72rem;font-weight:700;color:var(--accent)">
+          → Schritt 2: In Claude einfügen
+        </div>
+        <div style="width:24px;height:1px;background:var(--border);flex-shrink:0"></div>
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;background:var(--panel2);border:1px solid var(--border);font-size:.72rem;font-weight:700;color:var(--dim)">
+          Schritt 3: Antwort einfügen
+        </div>
       </div>
+
+      <!-- Action row: re-copy + expand prompt -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <a href="https://claude.ai" target="_blank"
+           style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;border:1px solid rgba(124,140,248,.4);background:var(--accent-bg);color:var(--accent);font-size:.78rem;font-weight:700;text-decoration:none;transition:all .15s"
+           onmouseover="this.style.background='rgba(124,140,248,.18)'" onmouseout="this.style.background='var(--accent-bg)'">
+          🔗 claude.ai öffnen
+        </a>
+        <button class="btn btn-ghost" id="paste-recopy-btn" style="font-size:.75rem">📋 Prompt erneut kopieren</button>
+        <button class="btn btn-ghost" id="paste-show-prompt-btn" style="font-size:.75rem;margin-left:auto">👁 Prompt anzeigen ▾</button>
+      </div>
+
+      <!-- Collapsible prompt text -->
+      <div id="paste-prompt-preview" style="display:none;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:.68rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em">Prompt-Text (zum manuellen Kopieren)</span>
+          <button onclick="navigator.clipboard.writeText(document.getElementById('paste-prompt-text').value).then(()=>{ const b=this; b.textContent='✓ Kopiert'; setTimeout(()=>b.textContent='📋 Kopieren',1500); })"
+                  style="padding:2px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.7rem;cursor:pointer;font-family:var(--font-ui)">📋 Kopieren</button>
+        </div>
+        <textarea id="paste-prompt-text" rows="6" readonly
+          style="background:var(--bg);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;color:var(--muted);font-family:var(--font-mono);font-size:.7rem;line-height:1.5;resize:vertical;outline:none;width:100%;cursor:text"
+          spellcheck="false"></textarea>
+      </div>
+
+      <!-- Response input -->
       <div class="modal-field">
-        <label class="modal-label">Antwort von Claude hier einfügen</label>
-        <textarea id="paste-modal-input" rows="8"
+        <label class="modal-label">Antwort von Claude hier einfügen (Schritt 3)</label>
+        <textarea id="paste-modal-input" rows="7"
           style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:.78rem;line-height:1.6;resize:vertical;outline:none;transition:border-color .15s;width:100%"
           placeholder='{ "zusammenfassung": "...", "offeneInfos": [...], "prio": "Hoch", ... }'
           spellcheck="false"></textarea>
@@ -1533,18 +1569,29 @@ Prioritätswerte: Niedrig | Mittel | Hoch | Kritisch`;
     const prompt = buildPromptText(context);
     navigator.clipboard.writeText(prompt).then(() => {
       showToast('Prompt kopiert – jetzt in Claude einfügen ✓');
-      // Show paste modal so user can paste the response back
-      openPasteModal();
+      openPasteModal(prompt);
     }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
   }
 
   // ── Manual paste modal logic ─────────────────────────────
   let _pendingSess = null;
 
-  function openPasteModal() {
+  let _lastPromptText = '';
+
+  function openPasteModal(promptText) {
+    _lastPromptText = promptText || _lastPromptText;
     document.getElementById('paste-modal-input').value = '';
+    document.getElementById('paste-modal-error').textContent = '';
+    // Populate prompt preview textarea
+    const previewEl = document.getElementById('paste-prompt-text');
+    if (previewEl) previewEl.value = _lastPromptText;
+    // Reset prompt preview visibility
+    const preview = document.getElementById('paste-prompt-preview');
+    const showBtn = document.getElementById('paste-show-prompt-btn');
+    if (preview) preview.style.display = 'none';
+    if (showBtn) showBtn.textContent = '👁 Prompt anzeigen ▾';
     openModal('paste-modal');
-    setTimeout(() => document.getElementById('paste-modal-input').focus(), 100);
+    setTimeout(() => document.getElementById('paste-modal-input').focus(), 150);
   }
 
   function processPastedResponse(raw) {
@@ -1922,6 +1969,26 @@ Prioritätswerte: Niedrig | Mittel | Hoch | Kritisch`;
 
   document.getElementById('paste-modal').addEventListener('click', e => {
     if (e.target.id === 'paste-modal') closeModal('paste-modal');
+  });
+
+  document.getElementById('paste-recopy-btn').addEventListener('click', () => {
+    if (!_lastPromptText) { showToast('Kein Prompt verfügbar', 'error'); return; }
+    navigator.clipboard.writeText(_lastPromptText).then(() => {
+      const btn = document.getElementById('paste-recopy-btn');
+      const orig = btn.textContent;
+      btn.textContent = '✓ Erneut kopiert!';
+      btn.style.color = 'var(--green)';
+      btn.style.borderColor = 'rgba(74,222,128,.3)';
+      setTimeout(() => { btn.textContent = orig; btn.style.color=''; btn.style.borderColor=''; }, 1800);
+    }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
+  });
+
+  document.getElementById('paste-show-prompt-btn').addEventListener('click', () => {
+    const preview = document.getElementById('paste-prompt-preview');
+    const btn = document.getElementById('paste-show-prompt-btn');
+    const isVisible = preview.style.display !== 'none';
+    preview.style.display = isVisible ? 'none' : '';
+    btn.textContent = isVisible ? '👁 Prompt anzeigen ▾' : '👁 Prompt ausblenden ▴';
   });
 
   document.getElementById('paste-modal-input').addEventListener('keydown', e => {
