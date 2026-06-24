@@ -529,10 +529,10 @@
       font-size: .75rem;
       font-weight: 700;
     }
-    .prio-Kritisch { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
-    .prio-Hoch     { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
-    .prio-Mittel   { background: var(--accent-bg); color: var(--accent); border: 1px solid rgba(124,140,248,.3); }
-    .prio-Niedrig  { background: var(--green-bg); color: var(--green); border: 1px solid rgba(74,222,128,.3); }
+    .prio-1 { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+    .prio-2 { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
+    .prio-3 { background: rgba(251,191,36,.08); color: #e8b339; border: 1px solid rgba(232,179,57,.3); }
+    .prio-4 { background: var(--accent-bg); color: var(--accent); border: 1px solid rgba(124,140,248,.3); }
 
     .ai-loading {
       display: flex;
@@ -1002,7 +1002,7 @@
         <label class="modal-label">Antwort von Claude hier einfügen (Schritt 3)</label>
         <textarea id="paste-modal-input" rows="7"
           style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:.78rem;line-height:1.6;resize:vertical;outline:none;transition:border-color .15s;width:100%"
-          placeholder='{ "zusammenfassung": "...", "offeneInfos": [...], "prio": "Hoch", ... }'
+          placeholder='{ "zusammenfassung": "...", "offeneInfos": [...], "prio": "Priorität 2", ... }'
           spellcheck="false"></textarea>
       </div>
       <div id="paste-modal-error" style="font-size:.75rem;color:var(--red);min-height:1rem;margin-top:-4px"></div>
@@ -1339,7 +1339,7 @@
       <div class="ai-section">
         <div class="ai-section-label">⚡ Vorabbewertung</div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <span class="prio-badge prio-${karte.prio}" data-field="prioBadge">${escHtml(karte.prio)}</span>
+          <span class="prio-badge prio-${karte.prio.replace('Priorität ','')}" data-field="prioBadge">${escHtml(karte.prio)}</span>
           <span style="font-size:.78rem;color:var(--muted)" data-field="zeiteinschaetzung">${escHtml(karte.zeiteinschaetzung)}</span>
         </div>
       </div>
@@ -1552,14 +1552,14 @@ Antworte AUSSCHLIESSLICH mit diesem JSON-Objekt (kein Markdown, keine Erklärung
 Regeln:
 - Zusammenfassung: Keine Floskeln. Fachbegriffe nutzen (DAG, Failover, RDS, GPO, etc.)
 - offeneInfos: Nur wirklich fehlende Infos – keine generischen Fragen die aus den Stichworten schon beantwortet sind. Max. 5 Punkte. Jeder Punkt beginnt mit dem konkreten Thema gefolgt von Doppelpunkt.
-- prio Kritisch: Totalausfall produktiver Systeme / Datenverlust / Sicherheitsvorfall
-- prio Hoch: Wichtige Systeme eingeschränkt, Redundanz ausgefallen, viele User betroffen
-- prio Mittel: Einzelne User/Funktionen betroffen, Workaround vorhanden
-- prio Niedrig: Kosmetisch, nice-to-have, kein Produktivitätsverlust
+- Priorität 1 (Kritisch): Totalausfall produktiver Systeme / Datenverlust / Sicherheitsvorfall
+- Priorität 2 (Hoch): Wichtige Systeme eingeschränkt, Redundanz ausgefallen, viele User betroffen
+- Priorität 3 (Mittel): Einzelne User/Funktionen betroffen, Workaround vorhanden
+- Priorität 4 (Niedrig): Kosmetisch, nice-to-have, kein Produktivitätsverlust
 - Zeiteinschätzung: Realistisch für erfahrenen Techniker. z.B. "30min", "1–2h", "2–4h", "halber Tag", "1–2 Tage"
 - Auswirkung: Immer auch erwähnen was NOCH funktioniert (Mailfluss über Node 1, etc.)
 
-Prioritätswerte: Niedrig | Mittel | Hoch | Kritisch`;
+Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 2 | Priorität 3 | Priorität 4`;
 
   function buildPromptText(context) {
     return MANUAL_SYSTEM_PROMPT + '\n\n---\n\n' + context;
@@ -1684,7 +1684,7 @@ Prioritätswerte: Niedrig | Mittel | Hoch | Kritisch`;
         eingabe: context,
         zusammenfassung: parsed.zusammenfassung || '',
         offeneInfos: parsed.offeneInfos || [],
-        prio: parsed.prio || 'Mittel',
+        prio: parsed.prio || 'Priorität 3',
         prioBegründung: parsed.prioBegründung || '',
         zeiteinschaetzung: `${parsed.zeiteinschaetzung || '–'} | ${parsed.prioBegründung || ''}`,
         auswirkung: parsed.auswirkung || '',
@@ -1953,7 +1953,7 @@ Prioritätswerte: Niedrig | Mittel | Hoch | Kritisch`;
       eingabe: '',
       zusammenfassung: parsed.zusammenfassung || '',
       offeneInfos: parsed.offeneInfos || [],
-      prio: parsed.prio || 'Mittel',
+      prio: parsed.prio || 'Priorität 3',
       prioBegründung: parsed.prioBegründung || '',
       zeiteinschaetzung: (parsed.zeiteinschaetzung || '–') + (parsed.prioBegründung ? ' | ' + parsed.prioBegründung : ''),
       auswirkung: parsed.auswirkung || '',
