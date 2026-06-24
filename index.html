@@ -782,6 +782,7 @@
         <span class="api-dot" id="api-dot"></span>
         <span id="api-status-label">Nicht verbunden – hier klicken zur Anmeldung</span>
       </button>
+      <button class="cache-btn" id="backup-btn" style="border-color:var(--border2);color:var(--muted)">💾 Backup</button>
       <button class="cache-btn" id="cache-btn">Cache leeren ⌫</button>
     </div>
   </header>
@@ -856,6 +857,20 @@
 
       <!-- Report -->
       <div class="report-section" id="report-section" style="display:none">
+        <!-- Kontaktdaten Block -->
+        <div id="report-contact-block" style="display:none;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--panel2)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:.68rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em">📋 Kontaktdaten</span>
+            <button id="btn-copy-contact"
+              style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.7rem;font-weight:600;cursor:pointer;font-family:var(--font-ui);transition:all .15s"
+              onmouseover="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'"
+              onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--dim)'">
+              📋 Kopieren
+            </button>
+          </div>
+          <div style="display:flex;gap:24px;flex-wrap:wrap" id="report-contact-fields"></div>
+        </div>
+
         <!-- Stat Block -->
         <div class="stat-block" id="stat-block">
           <div class="stat-item">
@@ -884,6 +899,7 @@
         <div class="report-actions">
           <button class="btn btn-primary" id="btn-copy-ticket">📋 Ticket kopieren</button>
           <button class="btn btn-ghost" id="btn-reopen">↩ Fall wieder aufnehmen</button>
+          <button class="btn btn-ghost" id="btn-debug-report" style="margin-left:auto;font-size:.72rem;color:var(--dim);border-color:var(--border)" title="Vollständigen Debug-Bericht in Zwischenablage kopieren">🐛 Bericht für Debug</button>
         </div>
       </div>
 
@@ -938,6 +954,50 @@
       <div class="modal-btns">
         <button class="btn btn-ghost" id="new-tab-cancel">Abbrechen</button>
         <button class="btn btn-primary" id="new-tab-confirm">Gespräch starten</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL: Backup ─────────────────────────────────── -->
+  <div class="modal-overlay" id="backup-modal">
+    <div class="modal" style="max-width:500px">
+      <div class="modal-title">💾 Backup</div>
+      <div class="modal-desc">Alle Gespräche, Notizen und Abschlussberichte als JSON-Datei sichern oder wiederherstellen. Der API-Key wird nicht exportiert.</div>
+
+      <!-- Export -->
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:14px 16px;margin-bottom:12px">
+        <div style="font-size:.72rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📤 Exportieren</div>
+        <div style="font-size:.8rem;color:var(--muted);margin-bottom:12px;line-height:1.5" id="backup-export-info">–</div>
+        <button class="btn btn-primary" id="backup-export-btn" style="width:100%;justify-content:center">
+          💾 Als JSON speichern
+        </button>
+      </div>
+
+      <!-- Import -->
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:14px 16px">
+        <div style="font-size:.72rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📥 Wiederherstellen</div>
+        <div style="font-size:.78rem;color:var(--muted);margin-bottom:10px;line-height:1.5">Bestehende Daten werden mit dem Backup zusammengeführt. Eigener Name und API-Key bleiben erhalten.</div>
+
+        <!-- Drop zone -->
+        <div id="backup-dropzone"
+          style="border:2px dashed var(--border2);border-radius:9px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:10px;color:var(--dim);font-size:.82rem"
+          onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--muted)'"
+          onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--dim)'">
+          <div style="font-size:1.6rem;margin-bottom:6px">📂</div>
+          <div>JSON-Datei hier ablegen oder klicken zum Auswählen</div>
+          <input type="file" id="backup-file-input" accept=".json" style="display:none">
+        </div>
+
+        <div id="backup-import-preview" style="display:none;margin-bottom:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:.78rem;color:var(--muted);line-height:1.6"></div>
+        <div id="backup-import-error" style="font-size:.75rem;color:var(--red);min-height:1rem"></div>
+
+        <button class="btn btn-amber" id="backup-import-btn" disabled style="width:100%;justify-content:center;opacity:.4">
+          📥 Backup einspielen
+        </button>
+      </div>
+
+      <div class="modal-btns" style="margin-top:14px">
+        <button class="btn btn-ghost" id="backup-modal-close">Schließen</button>
       </div>
     </div>
   </div>
@@ -1787,6 +1847,28 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     const to = document.getElementById('ticket-output');
     to.textContent = sess.ticketText || '';
 
+    // Contact block
+    const k = sess.kontakt || {};
+    const contactItems = [
+      { label: 'Name Anrufer',  value: k.nameAnrufer },
+      { label: 'Firma',         value: k.firma },
+      { label: 'Telefon',       value: k.telefon },
+      { label: 'E-Mail',        value: k.email },
+    ].filter(i => i.value && i.value.trim());
+
+    const contactBlock = document.getElementById('report-contact-block');
+    const contactFields = document.getElementById('report-contact-fields');
+    if (contactItems.length > 0) {
+      contactFields.innerHTML = contactItems.map(i => `
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:.65rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em">${i.label}</span>
+          <span style="font-size:.85rem;color:var(--text);font-weight:600">${i.value}</span>
+        </div>`).join('');
+      contactBlock.style.display = '';
+    } else {
+      contactBlock.style.display = 'none';
+    }
+
     document.getElementById('report-section').style.display = '';
 
     // Lock workspace inputs
@@ -2055,6 +2137,296 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     document.getElementById(id).addEventListener('click', e => {
       if (e.target.id === id) closeModal(id);
     });
+  });
+
+  document.getElementById('btn-copy-contact').addEventListener('click', () => {
+    const sess = getSession(activeId);
+    if (!sess) return;
+    const k = sess.kontakt || {};
+    const parts = [
+      k.nameAnrufer ? `Name: ${k.nameAnrufer}` : '',
+      k.firma       ? `Firma: ${k.firma}`       : '',
+      k.telefon     ? `Tel: ${k.telefon}`       : '',
+      k.email       ? `E-Mail: ${k.email}`      : '',
+    ].filter(Boolean);
+    if (parts.length === 0) { showToast('Keine Kontaktdaten vorhanden', 'error'); return; }
+    navigator.clipboard.writeText(parts.join('\n')).then(() => {
+      const btn = document.getElementById('btn-copy-contact');
+      const orig = btn.textContent;
+      btn.textContent = '✓ Kopiert';
+      btn.style.color = 'var(--green)';
+      btn.style.borderColor = 'rgba(74,222,128,.3)';
+      setTimeout(() => { btn.textContent = orig; btn.style.color=''; btn.style.borderColor=''; }, 1800);
+    }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
+  });
+
+  // ── Backup ──────────────────────────────────────────────
+  function openBackupModal() {
+    // Update export info
+    const sessCount = sessions.length;
+    const reportCount = sessions.filter(s => s.abgeschlossen && s.ticketText).length;
+    const totalKarten = sessions.reduce((a, s) => a + (s.karten || []).length, 0);
+    document.getElementById('backup-export-info').innerHTML =
+      `<span style="color:var(--text);font-weight:600">${sessCount}</span> Gespräche &nbsp;·&nbsp; ` +
+      `<span style="color:var(--text);font-weight:600">${reportCount}</span> Abschlussberichte &nbsp;·&nbsp; ` +
+      `<span style="color:var(--text);font-weight:600">${totalKarten}</span> KI-Auswertungen`;
+
+    // Reset import state
+    document.getElementById('backup-import-preview').style.display = 'none';
+    document.getElementById('backup-import-preview').innerHTML = '';
+    document.getElementById('backup-import-error').textContent = '';
+    document.getElementById('backup-import-btn').disabled = true;
+    document.getElementById('backup-import-btn').style.opacity = '.4';
+    document.getElementById('backup-file-input').value = '';
+    window._pendingBackup = null;
+
+    openModal('backup-modal');
+  }
+
+  function doExport() {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      eigenerName: localStorage.getItem(KEY_NAME) || '',
+      sessions: sessions
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const date = new Date();
+    const ds   = `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}`;
+    const ts   = `${String(date.getHours()).padStart(2,'0')}${String(date.getMinutes()).padStart(2,'0')}`;
+    a.href     = url;
+    a.download = `ticketassistent-backup-${ds}-${ts}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Backup gespeichert ✓');
+  }
+
+  function handleBackupFile(file) {
+    if (!file || !file.name.endsWith('.json')) {
+      document.getElementById('backup-import-error').textContent = 'Bitte eine .json-Datei auswählen.';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!data.version || !Array.isArray(data.sessions)) throw new Error('Ungültiges Format');
+
+        const sessCount    = data.sessions.length;
+        const reportCount  = data.sessions.filter(s => s.abgeschlossen && s.ticketText).length;
+        const totalKarten  = data.sessions.reduce((a, s) => a + (s.karten || []).length, 0);
+        const exportedAt   = data.exportedAt ? new Date(data.exportedAt).toLocaleString('de-DE') : 'unbekannt';
+
+        document.getElementById('backup-import-preview').style.display = '';
+        document.getElementById('backup-import-preview').innerHTML =
+          `<strong style="color:var(--text)">Backup vom ${exportedAt}</strong><br>` +
+          `${sessCount} Gespräche · ${reportCount} Abschlussberichte · ${totalKarten} KI-Auswertungen<br>` +
+          (data.eigenerName ? `Name: <span style="color:var(--text)">${data.eigenerName}</span>` : '');
+        document.getElementById('backup-import-error').textContent = '';
+        document.getElementById('backup-import-btn').disabled = false;
+        document.getElementById('backup-import-btn').style.opacity = '1';
+        window._pendingBackup = data;
+      } catch {
+        document.getElementById('backup-import-error').textContent = 'Datei konnte nicht gelesen werden – ungültiges Format.';
+        document.getElementById('backup-import-preview').style.display = 'none';
+        document.getElementById('backup-import-btn').disabled = true;
+        document.getElementById('backup-import-btn').style.opacity = '.4';
+        window._pendingBackup = null;
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function doImport() {
+    const data = window._pendingBackup;
+    if (!data) return;
+
+    // Merge: add sessions that don't exist yet (by id)
+    const existingIds = new Set(sessions.map(s => s.id));
+    let added = 0;
+    data.sessions.forEach(s => {
+      if (!existingIds.has(s.id)) {
+        sessions.push(s);
+        added++;
+      }
+    });
+
+    // Keep max 20, keep newest
+    if (sessions.length > MAX_SESSIONS) {
+      sessions = sessions.slice(-MAX_SESSIONS);
+    }
+
+    // Restore eigenerName only if currently empty
+    if (data.eigenerName && !localStorage.getItem(KEY_NAME)) {
+      localStorage.setItem(KEY_NAME, data.eigenerName);
+      document.getElementById('own-name-input').value = data.eigenerName;
+    }
+
+    saveSessions();
+    renderTabs();
+
+    // Activate last session
+    if (sessions.length > 0) activateSession(sessions[sessions.length - 1].id);
+
+    closeModal('backup-modal');
+    showToast(`${added} Gespräche wiederhergestellt ✓`);
+    window._pendingBackup = null;
+  }
+
+  // Backup button
+  document.getElementById('backup-btn').addEventListener('click', openBackupModal);
+  document.getElementById('backup-modal-close').addEventListener('click', () => closeModal('backup-modal'));
+  document.getElementById('backup-modal').addEventListener('click', e => {
+    if (e.target.id === 'backup-modal') closeModal('backup-modal');
+  });
+  document.getElementById('backup-export-btn').addEventListener('click', doExport);
+  document.getElementById('backup-import-btn').addEventListener('click', doImport);
+
+  // File input
+  document.getElementById('backup-dropzone').addEventListener('click', () => {
+    document.getElementById('backup-file-input').click();
+  });
+  document.getElementById('backup-file-input').addEventListener('change', e => {
+    handleBackupFile(e.target.files[0]);
+  });
+
+  // Drag & drop
+  const dz = document.getElementById('backup-dropzone');
+  dz.addEventListener('dragover', e => {
+    e.preventDefault();
+    dz.style.borderColor = 'var(--accent)';
+    dz.style.background  = 'var(--accent-bg)';
+  });
+  dz.addEventListener('dragleave', () => {
+    dz.style.borderColor = 'var(--border2)';
+    dz.style.background  = '';
+  });
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.style.borderColor = 'var(--border2)';
+    dz.style.background  = '';
+    handleBackupFile(e.dataTransfer.files[0]);
+  });
+
+  // ── Debug Report ────────────────────────────────────────
+  function buildDebugReport() {
+    const sess = getSession(activeId);
+    if (!sess) return '';
+
+    const line = (n = 60) => '─'.repeat(n);
+    const ts = new Date().toLocaleString('de-DE');
+    const eigenerName = localStorage.getItem(KEY_NAME) || '–';
+    const k = sess.kontakt || {};
+
+    let out = [];
+
+    out.push('╔══════════════════════════════════════════════════════════╗');
+    out.push('║            TICKETASSISTENT – DEBUG-BERICHT               ║');
+    out.push('╚══════════════════════════════════════════════════════════╝');
+    out.push('');
+    out.push(`Erstellt:        ${ts}`);
+    out.push(`Techniker:       ${eigenerName}`);
+    out.push(`Session-ID:      ${sess.id}`);
+    out.push(`Session-Titel:   ${sess.tabDisplay || sess.label}`);
+    out.push('');
+
+    // Anrufe
+    out.push(line());
+    out.push('ANRUF-TIMER');
+    out.push(line());
+    const anrufe = sess.anrufe || [];
+    if (anrufe.length === 0) {
+      out.push('Kein Anruf-Timer gestartet.');
+    } else {
+      anrufe.forEach((a, i) => {
+        const start = new Date(a.start);
+        const end   = a.end ? new Date(a.end) : null;
+        const dur   = end ? fmtDuration(Math.floor((end - start) / 1000)) : 'läuft noch';
+        out.push(`Anruf #${i+1}: ${fmtDateTime(start)} – ${end ? fmtTime(end) : '–'}  (${dur})`);
+      });
+      const totalSecs = anrufe.reduce((acc, a) => {
+        if (a.end) return acc + Math.floor((new Date(a.end) - new Date(a.start)) / 1000);
+        return acc;
+      }, 0);
+      if (anrufe.length > 1) out.push(`Gesamt: ${fmtDuration(totalSecs)}`);
+    }
+    out.push('');
+
+    // Kontaktdaten
+    out.push(line());
+    out.push('KONTAKTDATEN (nicht an KI gesendet)');
+    out.push(line());
+    out.push(`Name Anrufer:  ${k.nameAnrufer || '–'}`);
+    out.push(`Firma:         ${k.firma       || '–'}`);
+    out.push(`Telefon:       ${k.telefon     || '–'}`);
+    out.push(`E-Mail:        ${k.email       || '–'}`);
+    out.push('');
+
+    // Notizen
+    out.push(line());
+    out.push('URSPRÜNGLICHE NOTIZEN');
+    out.push(line());
+    out.push(sess.notizen || '(leer)');
+    out.push('');
+
+    // KI-Karten
+    out.push(line());
+    out.push(`KI-AUSWERTUNGEN (${sess.karten.length} Runden)`);
+    out.push(line());
+    sess.karten.forEach((k, i) => {
+      out.push('');
+      out.push(`── KI-Auswertung #${k.id} [${k.timestamp}] ${'─'.repeat(30)}`);
+      out.push('');
+      out.push('ZUSAMMENFASSUNG:');
+      out.push(k.zusammenfassung || '–');
+      out.push('');
+      out.push('NOCH BENÖTIGTE INFOS:');
+      (k.offeneInfos || []).forEach(info => out.push(`  • ${info}`));
+      if (!k.offeneInfos || k.offeneInfos.length === 0) out.push('  (keine)');
+      out.push('');
+      out.push(`PRIORITÄT:        ${k.prio || '–'}`);
+      out.push(`ZEITEINSCHÄTZUNG: ${(k.zeiteinschaetzung || '–').split('|')[0].trim()}`);
+      out.push(`BEGRÜNDUNG:       ${(k.zeiteinschaetzung || '').includes('|') ? k.zeiteinschaetzung.split('|')[1].trim() : '–'}`);
+      out.push('');
+      out.push('AUSWIRKUNG:');
+      out.push(k.auswirkung || '–');
+      if (k.eingabe) {
+        out.push('');
+        out.push('TECHNIKER-EINGABE (Kontext dieser Runde):');
+        out.push(k.eingabe.length > 500 ? k.eingabe.substring(0, 500) + '
+… (gekürzt)' : k.eingabe);
+      }
+    });
+    out.push('');
+
+    // Abschlussbericht
+    out.push(line());
+    out.push('ABSCHLUSSBERICHT / TICKET');
+    out.push(line());
+    out.push(sess.ticketText || '(noch nicht generiert)');
+    out.push('');
+    out.push(line());
+    out.push(`Ende Debug-Bericht · ${ts}`);
+    out.push(line());
+
+    return out.join('
+');
+  }
+
+  document.getElementById('btn-debug-report').addEventListener('click', () => {
+    const report = buildDebugReport();
+    if (!report) { showToast('Kein aktives Gespräch', 'error'); return; }
+    navigator.clipboard.writeText(report).then(() => {
+      const btn = document.getElementById('btn-debug-report');
+      const orig = btn.textContent;
+      btn.textContent = '✓ Debug-Bericht kopiert';
+      btn.style.color = 'var(--green)';
+      btn.style.borderColor = 'rgba(74,222,128,.3)';
+      setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 2000);
+    }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
   });
 
   // ── START ─────────────────────────────────────────────────
