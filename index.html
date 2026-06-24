@@ -325,7 +325,8 @@
     .empty-state-btn:hover { background: rgba(124,140,248,.18); }
 
     /* ── SESSION CONTENT ──────────────────────────────────── */
-    .session-content { display: flex; flex-direction: column; gap: 16px; flex: 1; }
+    .session-content { display: flex; flex-direction: row; gap: 0; flex: 1; min-height: 0; }
+    .session-main { display: flex; flex-direction: column; gap: 16px; flex: 1; min-width: 0; padding-right: 0; }
 
     /* Kontaktdaten */
     .contact-section {
@@ -397,6 +398,108 @@
     .workspace::-webkit-scrollbar-track { background: var(--bg); }
     .workspace::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 
+    /* ── Personal Notes Panel ───────────────────────────── */
+    .pers-panel {
+      width: 0;
+      min-width: 0;
+      overflow: hidden;
+      transition: width .25s ease, min-width .25s ease;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: #1a1428;
+      border-left: 2px solid #5b3fa6;
+      position: relative;
+      order: 999;
+    }
+    .pers-panel.open {
+      width: 260px;
+      min-width: 260px;
+    }
+    .pers-toggle {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%) translateX(-100%);
+      z-index: 50;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      background: #2d1f5e;
+      border: 1px solid #5b3fa6;
+      border-right: none;
+      border-radius: 8px 0 0 8px;
+      padding: 12px 6px;
+      color: #a78bfa;
+      font-size: .7rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .pers-toggle:hover { background: #3d2878; color: #c4b5fd; }
+    .pers-panel-inner {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 14px 0 14px 14px;
+      min-width: 260px;
+    }
+    .pers-panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding-right: 14px;
+    }
+    .pers-panel-title {
+      font-size: .78rem;
+      font-weight: 700;
+      color: #a78bfa;
+      flex: 1;
+      letter-spacing: .02em;
+    }
+    .pers-badge {
+      font-size: .6rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(167,139,250,.15);
+      border: 1px solid rgba(167,139,250,.3);
+      color: #a78bfa;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .pers-textarea {
+      flex: 1;
+      background: rgba(0,0,0,.25);
+      border: 1px solid rgba(167,139,250,.2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #d4c5f9;
+      font-family: var(--font-ui);
+      font-size: .82rem;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      transition: border-color .15s;
+      margin-right: 14px;
+    }
+    .pers-textarea:focus { border-color: rgba(167,139,250,.5); }
+    .pers-textarea::placeholder { color: rgba(167,139,250,.35); }
+    .pers-hint {
+      font-size: .68rem;
+      color: rgba(167,139,250,.45);
+      margin-top: 8px;
+      margin-right: 14px;
+      line-height: 1.4;
+    }
+
+    /* ── Arrow between cards ─────────────────────────────── */
     /* Arrow between cards */
     .card-arrow {
       display: flex;
@@ -812,6 +915,26 @@
     <!-- Session-Inhalt (wird dynamisch befüllt) -->
     <div class="session-content" id="session-content" style="display:none">
 
+      <!-- Personal Notes Panel (left side) -->
+      <div class="pers-panel" id="pers-panel">
+        <button class="pers-toggle" id="pers-toggle" title="Persönliche Notizen ein-/ausblenden">
+          🔒 Persönliche Notizen
+        </button>
+        <div class="pers-panel-inner">
+          <div class="pers-panel-header">
+            <span style="font-size:1rem">🔒</span>
+            <span class="pers-panel-title">Persönliche Notizen</span>
+            <span class="pers-badge">Privat</span>
+          </div>
+          <textarea class="pers-textarea" id="pers-textarea"
+            placeholder="Nur für dich – wird nicht an die KI gesendet und nicht ins Ticket übernommen.&#10;&#10;z.B. interne Hinweise, To-Dos, Verdacht auf bekanntes Problem …"></textarea>
+          <div class="pers-hint">🔒 Privat · Nur lokal gespeichert · Nicht im Ticket enthalten</div>
+        </div>
+      </div>
+
+      <!-- Main content -->
+      <div class="session-main">
+
       <!-- Kontaktdaten -->
       <div class="contact-section">
         <button class="contact-toggle open" id="contact-toggle">
@@ -903,6 +1026,7 @@
         </div>
       </div>
 
+      </div><!-- /session-main -->
     </div>
   </main>
 
@@ -1187,6 +1311,7 @@
       createdAt: now.toISOString(),
       tabDisplay,
       anrufe: [],
+      persNotizen: '',
       kontakt: { nameAnrufer: '', firma: '', telefon: '', email: '' },
       notizen: '',
       karten: [],
@@ -1325,6 +1450,7 @@
 
     // Notes
     document.getElementById('notes-textarea').value = sess.notizen || '';
+    document.getElementById('pers-textarea').value = sess.persNotizen || '';
 
     // Workspace: rebuild KI cards
     buildWorkspace(sess);
@@ -2430,6 +2556,20 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       btn.style.borderColor = 'rgba(74,222,128,.3)';
       setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 2000);
     }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
+  });
+
+  // ── Personal Notes Panel ───────────────────────────────
+  document.getElementById('pers-toggle').addEventListener('click', () => {
+    const panel = document.getElementById('pers-panel');
+    panel.classList.toggle('open');
+    // reposition toggle - handled by CSS fixed positioning
+  });
+
+  document.getElementById('pers-textarea').addEventListener('input', () => {
+    const sess = getSession(activeId);
+    if (!sess) return;
+    sess.persNotizen = document.getElementById('pers-textarea').value;
+    saveSessions();
   });
 
   // ── START ─────────────────────────────────────────────────
