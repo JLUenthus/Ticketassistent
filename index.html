@@ -2417,6 +2417,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       prioBegründung: parsed.prioBegründung || '',
       zeiteinschaetzung: (parsed.zeiteinschaetzung || '–') + (parsed.prioBegründung ? ' | ' + parsed.prioBegründung : ''),
       auswirkung: parsed.auswirkung || '',
+      routing: parsed.routing || [],
       editierbar: true
     };
 
