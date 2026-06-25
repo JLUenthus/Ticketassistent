@@ -516,8 +516,8 @@
       border-radius: var(--r-lg);
       display: flex;
       flex-direction: column;
-      width: 420px;
-      min-width: 420px;
+      width: 520px;
+      min-width: 520px;
       flex-shrink: 0;
       position: relative;
     }
@@ -1705,9 +1705,20 @@
       </div>
 
       <div class="ai-section">
-        <div class="ai-section-label">❓ Noch benötigte Infos</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div class="ai-section-label" style="margin-bottom:0">❓ Noch benötigte Infos</div>
+          <span style="font-size:.65rem;font-weight:600;color:var(--dim);letter-spacing:.03em">↓ in Chat einfügen</span>
+        </div>
         <ul class="ai-list" data-field="offeneInfos">
-          ${(karte.offeneInfos || []).map(i => `<li>${escHtml(i)}</li>`).join('')}
+          ${(karte.offeneInfos || []).map((info, idx) => `
+            <li style="display:flex;align-items:flex-start;gap:6px;cursor:default">
+              <span style="flex:1;word-break:break-word">${escHtml(info)}</span>
+              ${!locked ? `<button class="insert-info-btn" data-info="${escHtml(info).replace(/"/g,'&quot;')}"
+                style="flex-shrink:0;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.7rem;cursor:pointer;font-family:var(--font-ui);transition:all .12s;margin-top:1px"
+                title="In Chatbox einfügen"
+                onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+                onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--dim)'">↓</button>` : ''}
+            </li>`).join('')}
         </ul>
       </div>
 
@@ -1715,7 +1726,7 @@
         <div class="ai-section-label">⚡ Vorabbewertung</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <span class="prio-badge prio-${karte.prio.replace('Priorität ','')}" data-field="prioBadge">${escHtml(karte.prio)}</span>
-          ${(karte.routing || []).map(r => `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.25);color:#2dd4bf;font-size:.7rem;font-weight:700">${escHtml(r.kategorie)}<span style="opacity:.6;font-weight:400">${r.gewichtung}%</span></span>`).join('')}
+          ${(() => { const top = (karte.routing || []).sort((a,b) => b.gewichtung - a.gewichtung)[0]; return top ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.25);color:#2dd4bf;font-size:.7rem;font-weight:700">${escHtml(top.kategorie)}<span style="opacity:.6;font-weight:400">${top.gewichtung}%</span></span>` : ''; })()}
           <span style="font-size:.75rem;color:var(--dim)" data-field="zeiteinschaetzung">${escHtml(karte.zeiteinschaetzung)}</span>
         </div>
       </div>
@@ -1768,6 +1779,23 @@
         const context = buildContext(sess, extra);
         _pendingSess = sess;
         copyPromptToClipboard(context);
+      });
+
+      // Insert offeneInfo into textarea (append, never overwrite)
+      card.querySelectorAll('.insert-info-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const ta = card.querySelector('textarea');
+          const info = btn.dataset.info;
+          const cur = ta.value;
+          ta.value = cur ? cur + '\n' + info + ': ' : info + ': ';
+          ta.focus();
+          ta.setSelectionRange(ta.value.length, ta.value.length);
+          // Flash button green
+          btn.textContent = '✓';
+          btn.style.color = 'var(--green)';
+          btn.style.borderColor = 'rgba(74,222,128,.3)';
+          setTimeout(() => { btn.textContent = '↓'; btn.style.color = ''; btn.style.borderColor = ''; }, 1200);
+        });
       });
     }
 
