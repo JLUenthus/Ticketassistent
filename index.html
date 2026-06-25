@@ -1292,26 +1292,39 @@
       </div>
 
       <!-- Action row: re-copy + expand prompt -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:14px;flex-wrap:wrap">
 
-        <!-- Claude Desktop App öffnen via claude:// Protokoll -->
-        <a href="claude://claude.ai/new"
-           title="Claude Desktop App öffnen (muss installiert sein)"
-           style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;border:1px solid rgba(124,140,248,.4);background:var(--accent-bg);color:var(--accent);font-size:.78rem;font-weight:700;text-decoration:none;transition:all .15s;cursor:pointer"
-           onmouseover="this.style.background='rgba(124,140,248,.18)'" onmouseout="this.style.background='var(--accent-bg)'">
-          🖥️ Claude App öffnen
-        </a>
+        <!-- Linke Gruppe: App + URL kopieren untereinander -->
+        <div style="display:flex;flex-direction:column;gap:5px">
 
-        <!-- Fallback: claude.ai im Browser via URL kopieren -->
-        <button
-          onclick="copyToClipboard('https://claude.ai').then(()=>{ this.textContent='✓ URL kopiert'; this.style.color='var(--green)'; this.style.borderColor='rgba(74,222,128,.3)'; setTimeout(()=>{ this.textContent='🌐 claude.ai (URL kopieren)'; this.style.color=''; this.style.borderColor=''; },2000); }).catch(()=>showToast('Kopieren fehlgeschlagen','error'))"
-          style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--font-ui);transition:all .15s"
-          onmouseover="this.style.borderColor='var(--border2)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-          🌐 claude.ai (URL kopieren)
-        </button>
+          <!-- Claude Desktop App -->
+          <a href="claude://claude.ai/new"
+             title="Claude Desktop App öffnen (muss installiert sein)"
+             style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;border:1px solid rgba(124,140,248,.4);background:var(--accent-bg);color:var(--accent);font-size:.78rem;font-weight:700;text-decoration:none;transition:all .15s;cursor:pointer"
+             onmouseover="this.style.background='rgba(124,140,248,.18)'" onmouseout="this.style.background='var(--accent-bg)'">
+            🖥️ Claude App öffnen
+          </a>
 
-        <button class="btn btn-ghost" id="paste-recopy-btn" style="font-size:.75rem">📋 Prompt erneut kopieren</button>
-        <button class="btn btn-ghost" id="paste-show-prompt-btn" style="font-size:.75rem;margin-left:auto">👁 Prompt anzeigen ▾</button>
+          <!-- claude.ai im Browser öffnen -->
+          <a href="https://claude.ai" target="_blank" rel="noopener noreferrer"
+             style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.75rem;font-weight:600;text-decoration:none;transition:all .15s;cursor:pointer"
+             onmouseover="this.style.borderColor='var(--border2)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+            🌐 claude.ai im Browser
+          </a>
+
+          <!-- URL kopieren (Fallback für PWA) -->
+          <button
+            onclick="copyToClipboard('https://claude.ai').then(()=>{ this.textContent='✓ URL kopiert'; this.style.color='var(--green)'; this.style.borderColor='rgba(74,222,128,.3)'; setTimeout(()=>{ this.textContent='📋 URL kopieren'; this.style.color=''; this.style.borderColor=''; },2000); }).catch(()=>showToast('Kopieren fehlgeschlagen','error'))"
+            style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.72rem;font-weight:600;cursor:pointer;font-family:var(--font-ui);transition:all .15s"
+            onmouseover="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--dim)'"
+            title="URL kopieren und manuell in Browser einfügen">
+            📋 URL kopieren
+          </button>
+
+        </div>
+
+        <button class="btn btn-ghost" id="paste-recopy-btn" style="font-size:.75rem;align-self:center">📋 Prompt erneut kopieren</button>
+        <button class="btn btn-ghost" id="paste-show-prompt-btn" style="font-size:.75rem;margin-left:auto;align-self:center">👁 Prompt anzeigen ▾</button>
       </div>
 
       <!-- Collapsible prompt text -->
