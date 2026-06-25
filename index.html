@@ -921,7 +921,7 @@
 
     /* ── TOAST ────────────────────────────────────────────── */
     .toast {
-      position: fixed; bottom: 24px; right: 24px;
+      position: fixed; bottom: 12px; right: 12px;
       padding: 10px 18px;
       border-radius: 9px;
       font-size: .82rem; font-weight: 600;
@@ -1306,7 +1306,7 @@
       <div id="paste-prompt-preview" style="display:none;margin-bottom:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <span style="font-size:.68rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em">Prompt-Text (zum manuellen Kopieren)</span>
-          <button onclick="navigator.clipboard.writeText(document.getElementById('paste-prompt-text').value).then(()=>{ const b=this; b.textContent='✓ Kopiert'; setTimeout(()=>b.textContent='📋 Kopieren',1500); })"
+          <button onclick="copyToClipboard(document.getElementById('paste-prompt-text').value).then(()=>{ const b=this; b.textContent='✓ Kopiert'; setTimeout(()=>b.textContent='📋 Kopieren',1500); }).catch(()=>{ const b=this; b.textContent='✗ Fehler'; setTimeout(()=>b.textContent='📋 Kopieren',1500); })"
                   style="padding:2px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.7rem;cursor:pointer;font-family:var(--font-ui)">📋 Kopieren</button>
         </div>
         <textarea id="paste-prompt-text" rows="6" readonly
@@ -1397,6 +1397,32 @@
 
   // ── Toast ────────────────────────────────────────────────
   let toastTimer = null;
+  // ── Clipboard Helper (iframe-sicher) ────────────────────
+  // navigator.clipboard braucht Fokus – im iframe nicht immer gegeben.
+  // Fallback: temporäres Textarea + execCommand('copy')
+  function copyToClipboard(text) {
+    return new Promise((resolve, reject) => {
+      if (navigator.clipboard && document.hasFocus()) {
+        copyToClipboard(text).then(resolve).catch(() => fallback());
+      } else {
+        fallback();
+      }
+      function fallback() {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          ok ? resolve() : reject(new Error('execCommand failed'));
+        } catch(e) { reject(e); }
+      }
+    });
+  }
+
   function showToast(msg, type = 'success') {
     const t = document.getElementById('toast');
     t.textContent = msg;
@@ -1913,7 +1939,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
 
   function copyPromptToClipboard(context) {
     const prompt = buildPromptText(context);
-    navigator.clipboard.writeText(prompt).then(() => {
+    copyToClipboard(prompt).then(() => {
       showToast('Prompt kopiert – jetzt in Claude einfügen ✓');
       openPasteModal(prompt);
     }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
@@ -2151,7 +2177,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           <span style="font-size:.65rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em">${i.label}</span>
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:.85rem;color:var(--text);font-weight:600">${i.value}</span>
-            <button onclick="navigator.clipboard.writeText('${i.value.replace(/'/g, "\\'")}').then(()=>{ this.textContent='✓'; this.style.color='var(--green)'; this.style.borderColor='rgba(74,222,128,.3)'; setTimeout(()=>{ this.textContent='📋'; this.style.color=''; this.style.borderColor=''; },1500); })"
+            <button onclick="copyToClipboard('${i.value.replace(/'/g, "\\'")}').then(()=>{ this.textContent='✓'; this.style.color='var(--green)'; this.style.borderColor='rgba(74,222,128,.3)'; setTimeout(()=>{ this.textContent='📋'; this.style.color=''; this.style.borderColor=''; },1500); }).catch(()=>{ this.textContent='✗'; setTimeout(()=>this.textContent='📋',1500); })"
               style="padding:1px 6px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.68rem;cursor:pointer;flex-shrink:0;transition:all .15s;font-family:var(--font-ui)"
               title="${i.label} kopieren">📋</button>
           </div>
@@ -2192,7 +2218,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
 
   // ── Copy helpers ─────────────────────────────────────────
   function copyText(text, label = 'Kopiert') {
-    navigator.clipboard.writeText(text).then(() => {
+    copyToClipboard(text).then(() => {
       showToast(label + ' ✓');
     }).catch(() => {
       showToast('Kopieren fehlgeschlagen', 'error');
@@ -2352,7 +2378,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
 
   document.getElementById('paste-recopy-btn').addEventListener('click', () => {
     if (!_lastPromptText) { showToast('Kein Prompt verfügbar', 'error'); return; }
-    navigator.clipboard.writeText(_lastPromptText).then(() => {
+    copyToClipboard(_lastPromptText).then(() => {
       const btn = document.getElementById('paste-recopy-btn');
       const orig = btn.textContent;
       btn.textContent = '✓ Erneut kopiert!';
@@ -2447,7 +2473,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       k.email       ? `E-Mail: ${k.email}`      : '',
     ].filter(Boolean);
     if (parts.length === 0) { showToast('Keine Kontaktdaten vorhanden', 'error'); return; }
-    navigator.clipboard.writeText(parts.join('\n')).then(() => {
+    copyToClipboard(parts.join('\n')).then(() => {
       const btn = document.getElementById('btn-copy-contact');
       const orig = btn.textContent;
       btn.textContent = '✓ Kopiert';
@@ -2714,7 +2740,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
   document.getElementById('btn-debug-report').addEventListener('click', () => {
     const report = buildDebugReport();
     if (!report) { showToast('Kein aktives Gespräch', 'error'); return; }
-    navigator.clipboard.writeText(report).then(() => {
+    copyToClipboard(report).then(() => {
       const btn = document.getElementById('btn-debug-report');
       const orig = btn.textContent;
       btn.textContent = '✓ Debug-Bericht kopiert';
@@ -2805,7 +2831,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     const col = btn.dataset.col;
     const vals = getOneNoteValues();
     const text = vals[col] || '';
-    navigator.clipboard.writeText(text).then(() => {
+    copyToClipboard(text).then(() => {
       const orig = btn.textContent;
       btn.textContent = '✓';
       btn.style.color = 'var(--green)';
@@ -2846,7 +2872,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       }).catch(() => showToast('Kopieren fehlgeschlagen', 'error'));
     } catch {
       // Fallback plain text
-      navigator.clipboard.writeText(plainRow).then(() => showToast('Als Text kopiert (HTML nicht unterstützt)'));
+      copyToClipboard(plainRow).then(() => showToast('Als Text kopiert (HTML nicht unterstützt)'));
     }
   });
 
