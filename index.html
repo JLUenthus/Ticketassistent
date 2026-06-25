@@ -1273,81 +1273,83 @@
 
   <!-- ── MODAL: Manuelle KI-Antwort einfügen ──────────── -->
   <div class="modal-overlay" id="paste-modal">
-    <div class="modal" style="max-width:600px">
-      <div class="modal-title">📋 KI-Antwort einfügen</div>
+    <div class="modal" style="max-width:580px">
+      <div class="modal-title" style="margin-bottom:14px">📋 KI-Antwort einfügen</div>
 
-      <!-- Step indicator -->
-      <div style="display:flex;align-items:center;gap:0;margin-bottom:16px">
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;background:var(--green-bg);border:1px solid rgba(74,222,128,.3);font-size:.72rem;font-weight:700;color:var(--green)">
-          ✓ Schritt 1: Prompt kopiert
+      <!-- Stepper – kompakt -->
+      <div style="display:flex;align-items:center;margin-bottom:18px">
+        <div style="display:flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;color:var(--green)">
+          <span style="width:18px;height:18px;border-radius:50%;background:var(--green-bg);border:1px solid rgba(74,222,128,.4);display:inline-flex;align-items:center;justify-content:center;font-size:.62rem">✓</span>
+          Prompt kopiert
         </div>
-        <div style="width:24px;height:1px;background:var(--border);flex-shrink:0"></div>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);font-size:.72rem;font-weight:700;color:var(--accent)">
-          → Schritt 2: In Claude einfügen
+        <div style="flex:1;height:1px;background:var(--border);margin:0 8px"></div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;color:var(--accent)">
+          <span style="width:18px;height:18px;border-radius:50%;background:var(--accent-bg);border:1px solid rgba(124,140,248,.4);display:inline-flex;align-items:center;justify-content:center;font-size:.62rem;color:var(--accent)">2</span>
+          Claude öffnen
         </div>
-        <div style="width:24px;height:1px;background:var(--border);flex-shrink:0"></div>
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:6px;background:var(--panel2);border:1px solid var(--border);font-size:.72rem;font-weight:700;color:var(--dim)">
-          Schritt 3: Antwort einfügen
+        <div style="flex:1;height:1px;background:var(--border);margin:0 8px"></div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;color:var(--dim)">
+          <span style="width:18px;height:18px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:.62rem">3</span>
+          Antwort einfügen
         </div>
       </div>
 
-      <!-- Action row: re-copy + expand prompt -->
-      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-
-        <!-- Linke Gruppe: App + URL kopieren untereinander -->
-        <div style="display:flex;flex-direction:column;gap:5px">
-
-          <!-- Claude Desktop App -->
+      <!-- Block Schritt 2 -->
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px">
+        <div style="font-size:.65rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">
+          Schritt 2 · Claude öffnen &amp; Prompt einfügen
+        </div>
+        <!-- Öffnen-Buttons -->
+        <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">
           <a href="claude://claude.ai/new"
              title="Claude Desktop App öffnen (muss installiert sein)"
-             style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;border:1px solid rgba(124,140,248,.4);background:var(--accent-bg);color:var(--accent);font-size:.78rem;font-weight:700;text-decoration:none;transition:all .15s;cursor:pointer"
+             style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;border:1px solid rgba(124,140,248,.4);background:var(--accent-bg);color:var(--accent);font-size:.78rem;font-weight:700;text-decoration:none;transition:all .15s"
              onmouseover="this.style.background='rgba(124,140,248,.18)'" onmouseout="this.style.background='var(--accent-bg)'">
             🖥️ Claude App öffnen
           </a>
-
-          <!-- claude.ai im Browser öffnen -->
           <a href="https://claude.ai" target="_blank" rel="noopener noreferrer"
-             style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.75rem;font-weight:600;text-decoration:none;transition:all .15s;cursor:pointer"
+             style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.78rem;font-weight:600;text-decoration:none;transition:all .15s"
              onmouseover="this.style.borderColor='var(--border2)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
             🌐 claude.ai im Browser
           </a>
-
-          <!-- URL kopieren (Fallback für PWA) -->
           <button
             onclick="copyToClipboard('https://claude.ai').then(()=>{ this.textContent='✓ URL kopiert'; this.style.color='var(--green)'; this.style.borderColor='rgba(74,222,128,.3)'; setTimeout(()=>{ this.textContent='📋 URL kopieren'; this.style.color=''; this.style.borderColor=''; },2000); }).catch(()=>showToast('Kopieren fehlgeschlagen','error'))"
-            style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.72rem;font-weight:600;cursor:pointer;font-family:var(--font-ui);transition:all .15s"
+            style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.72rem;font-weight:600;cursor:pointer;font-family:var(--font-ui);transition:all .15s"
             onmouseover="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--dim)'"
             title="URL kopieren und manuell in Browser einfügen">
             📋 URL kopieren
           </button>
-
         </div>
-
-        <button class="btn btn-ghost" id="paste-recopy-btn" style="font-size:.75rem;align-self:center">📋 Prompt erneut kopieren</button>
-        <button class="btn btn-ghost" id="paste-show-prompt-btn" style="font-size:.75rem;margin-left:auto;align-self:center">👁 Prompt anzeigen ▾</button>
+        <!-- Prompt-Buttons -->
+        <div style="display:flex;gap:7px;padding-top:9px;border-top:1px solid var(--border)">
+          <button class="btn btn-ghost" id="paste-recopy-btn" style="font-size:.74rem">📋 Prompt erneut kopieren</button>
+          <button class="btn btn-ghost" id="paste-show-prompt-btn" style="font-size:.74rem">👁 Prompt anzeigen ▾</button>
+        </div>
+        <!-- Collapsible prompt text -->
+        <div id="paste-prompt-preview" style="display:none;margin-top:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:.65rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em">Prompt-Text</span>
+            <button onclick="copyToClipboard(document.getElementById('paste-prompt-text').value).then(()=>{ const b=this; b.textContent='✓ Kopiert'; setTimeout(()=>b.textContent='📋 Kopieren',1500); }).catch(()=>{ const b=this; b.textContent='✗ Fehler'; setTimeout(()=>b.textContent='📋 Kopieren',1500); })"
+                    style="padding:2px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.7rem;cursor:pointer;font-family:var(--font-ui)">📋 Kopieren</button>
+          </div>
+          <textarea id="paste-prompt-text" rows="5" readonly
+            style="background:var(--bg);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;color:var(--muted);font-family:var(--font-mono);font-size:.7rem;line-height:1.5;resize:vertical;outline:none;width:100%;cursor:text"
+            spellcheck="false"></textarea>
+        </div>
       </div>
 
-      <!-- Collapsible prompt text -->
-      <div id="paste-prompt-preview" style="display:none;margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <span style="font-size:.68rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em">Prompt-Text (zum manuellen Kopieren)</span>
-          <button onclick="copyToClipboard(document.getElementById('paste-prompt-text').value).then(()=>{ const b=this; b.textContent='✓ Kopiert'; setTimeout(()=>b.textContent='📋 Kopieren',1500); }).catch(()=>{ const b=this; b.textContent='✗ Fehler'; setTimeout(()=>b.textContent='📋 Kopieren',1500); })"
-                  style="padding:2px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:.7rem;cursor:pointer;font-family:var(--font-ui)">📋 Kopieren</button>
+      <!-- Block Schritt 3 -->
+      <div style="background:rgba(124,140,248,.04);border:1px solid rgba(124,140,248,.2);border-radius:10px;padding:12px 14px;margin-bottom:12px">
+        <div style="font-size:.65rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">
+          Schritt 3 · Antwort von Claude einfügen
         </div>
-        <textarea id="paste-prompt-text" rows="6" readonly
-          style="background:var(--bg);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;color:var(--muted);font-family:var(--font-mono);font-size:.7rem;line-height:1.5;resize:vertical;outline:none;width:100%;cursor:text"
-          spellcheck="false"></textarea>
-      </div>
-
-      <!-- Response input -->
-      <div class="modal-field">
-        <label class="modal-label">Antwort von Claude hier einfügen (Schritt 3)</label>
-        <textarea id="paste-modal-input" rows="7"
+        <textarea id="paste-modal-input" rows="6"
           style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:.78rem;line-height:1.6;resize:vertical;outline:none;transition:border-color .15s;width:100%"
           placeholder='{ "zusammenfassung": "...", "offeneInfos": [...], "prio": "Priorität 2", ... }'
           spellcheck="false"></textarea>
+        <div id="paste-modal-error" style="font-size:.72rem;color:var(--red);min-height:1rem;margin-top:5px"></div>
       </div>
-      <div id="paste-modal-error" style="font-size:.75rem;color:var(--red);min-height:1rem;margin-top:-4px"></div>
+
       <div class="modal-btns">
         <button class="btn btn-ghost" id="paste-modal-cancel">Abbrechen</button>
         <button class="btn btn-primary" id="paste-modal-confirm">Auswertung übernehmen ▶</button>
