@@ -1454,8 +1454,10 @@
   const KEY_JIRA_CLOUD   = 'ta_jiraCloudId';
   const KEY_JIRA_USER    = 'ta_jiraUser';
   const JIRA_CLIENT_ID   = 'ebfyOvhQso8SieLHc5ymMnsKkAD4sp1G';
+  // ⚠️ NUR FÜR TESTS – VOR PRODUKTIVBETRIEB ENTFERNEN UND DURCH BACKEND ERSETZEN
+  const JIRA_CLIENT_SECRET = 'ATOAY2iBBxmOh7GMQOPfpd_c2EPT5owuCOQhGttI2XYLAcbWC5gT3lkm99psON0JWbd_6C837327';
   const JIRA_CALLBACK    = 'https://jluenthus.github.io/Ticketassistent/';
-  const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me offline_access';
+  const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me';
   const KEY_NAME   = 'ta_eigenerName';
   const KEY_SESS   = 'ta_sessions';
   const KEY_ACTIVE = 'ta_activeTab';
@@ -3094,6 +3096,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         body: JSON.stringify({
           grant_type: 'authorization_code',
           client_id: JIRA_CLIENT_ID,
+          client_secret: JIRA_CLIENT_SECRET,
           code,
           redirect_uri: JIRA_CALLBACK,
           code_verifier: codeVerifier
@@ -3105,20 +3108,27 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       localStorage.setItem(KEY_JIRA_TOKEN, data.access_token);
       if (data.refresh_token) localStorage.setItem('ta_jira_refresh', data.refresh_token);
 
-      // Fetch user info
-      const meResp = await fetch('https://api.atlassian.com/me', {
-        headers: { Authorization: `Bearer ${data.access_token}`, Accept: 'application/json' }
-      });
-      const me = await meResp.json();
-      const displayName = me.name || me.email || 'Jira-User';
+      // Fetch user info via /me (User Identity API)
+      let displayName = 'Jira-User';
+      try {
+        const meResp = await fetch('https://api.atlassian.com/me', {
+          headers: { Authorization: `Bearer ${data.access_token}`, Accept: 'application/json' }
+        });
+        const me = await meResp.json();
+        displayName = me.name || me.email || 'Jira-User';
+      } catch(e) { console.warn('/me fetch failed', e); }
       localStorage.setItem(KEY_JIRA_USER, displayName);
 
       // Fetch accessible resources (cloud ID)
-      const resResp = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
-        headers: { Authorization: `Bearer ${data.access_token}`, Accept: 'application/json' }
-      });
-      const resources = await resResp.json();
-      if (resources.length > 0) localStorage.setItem(KEY_JIRA_CLOUD, resources[0].id);
+      try {
+        const resResp = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+          headers: { Authorization: `Bearer ${data.access_token}`, Accept: 'application/json' }
+        });
+        const resources = await resResp.json();
+        if (resources.length > 0) localStorage.setItem(KEY_JIRA_CLOUD, resources[0].id);
+      } catch(e) { console.warn('resources fetch failed', e); }
+
+
 
       localStorage.removeItem('ta_jira_verifier');
       localStorage.removeItem('ta_jira_state');
