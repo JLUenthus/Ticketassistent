@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v1.4-debug</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v1.5</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3666,7 +3666,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         const isKey = q.toUpperCase().startsWith('KUN');
         const aql = isKey
           ? `objectType = "Firma (Kunde)" AND objectKey = "${q}"`
-          : `objectType = "Firma (Kunde)" AND label LIKE "${q}%" ORDER BY label ASC`;
+          : `objectType = "Firma (Kunde)" AND Name LIKE "${q}%" ORDER BY Name ASC`;
         // DEBUG
         sug.innerHTML = `<div style="padding:6px 14px;color:var(--dim);font-size:.7rem;font-family:var(--font-mono)">🔍 AQL: ${aql}</div>`;
         sug.style.display = '';
@@ -3721,13 +3721,13 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         try {
           const wsId = await getWorkspaceId();
           if (!wsId) {
-            sug.innerHTML = `<div style="padding:9px 14px;color:var(--red);font-size:.78rem">❌ Workspace ID nicht verfügbar</div>`;
+            sug.innerHTML = `<div style="padding:9px 14px;color:var(--red);font-size:.78rem">❌ Workspace ID nicht verfügbar – bitte Jira neu verbinden</div>`;
             sug.style.display = '';
             return;
           }
-          const aql = `objectType = "Ansprechpartner (Kunde)" AND label LIKE "${q}%" ORDER BY label ASC`;
-          // DEBUG
-          sug.innerHTML = `<div style="padding:6px 14px;color:var(--dim);font-size:.7rem;font-family:var(--font-mono)">🔍 wsId: ${wsId}<br>AQL: ${aql}</div>`;
+          const aql = `objectType = "Ansprechpartner (Kunde)" AND Name LIKE "${q}%" ORDER BY Name ASC`;
+          // DEBUG – zeigt wsId und AQL
+          sug.innerHTML = `<div style="padding:6px 14px;color:var(--dim);font-size:.7rem;font-family:var(--font-mono)">wsId: ${wsId}<br>AQL: ${aql}</div>`;
           sug.style.display = '';
           const objects = await searchAssets(aql, 8);
           if (!objects.length) {
