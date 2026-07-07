@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v0.8</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v0.9</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3713,22 +3713,25 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       try {
         // Search Ansprechpartner via Assets AQL
         try {
-          // Fetch attribute definitions for Ansprechpartner to get correct names
+          const wsId = await getWorkspaceId();
+          if (!wsId) { sug.style.display = 'none'; return; }
+          // Fetch attribute definitions once and cache
           let vornameAttr = 'Vorname';
           let nachnameAttr = 'Nachname';
-          try {
-            const typeResp = await fetch(
-              `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/objecttypeattribute/search?objectTypeId=3&maxResults=50`,
-              { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
-            );
-            const typeData = await typeResp.json();
-            const attrs = typeData.values || typeData || [];
-            // Cache globally
-            window._apAttrNames = {};
-            attrs.forEach(a => { window._apAttrNames[String(a.id)] = a.name; });
-            vornameAttr  = window._apAttrNames['37'] || 'Vorname';
-            nachnameAttr = window._apAttrNames['38'] || 'Nachname';
-          } catch(e) {}
+          if (!window._apAttrNames) {
+            try {
+              const typeResp = await fetch(
+                `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/objecttypeattribute/search?objectTypeId=3&maxResults=50`,
+                { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+              );
+              const typeData = await typeResp.json();
+              const attrs = typeData.values || typeData || [];
+              window._apAttrNames = {};
+              attrs.forEach(a => { window._apAttrNames[String(a.id)] = a.name; });
+            } catch(e) { window._apAttrNames = {}; }
+          }
+          vornameAttr  = window._apAttrNames['37'] || 'Vorname';
+          nachnameAttr = window._apAttrNames['38'] || 'Nachname';
           const aql = `objectType = "Ansprechpartner (Kunde)" AND (Name LIKE "${qTrimmed}%" OR "${vornameAttr}" LIKE "${qTrimmed}%" OR "${nachnameAttr}" LIKE "${qTrimmed}%") ORDER BY Name ASC`;
           const objects = await searchAssets(aql, 8);
           if (!objects.length) { sug.style.display = 'none'; return; }
