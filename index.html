@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v1.7</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v1.8</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3578,17 +3578,43 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
     const wsId  = await getWorkspaceId();
     if (!wsId) throw new Error('Workspace ID nicht verfügbar');
-    const r = await fetch(
-      `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/object/aql`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qlQuery: aql, startAt: 0, maxResults, includeAttributes: true })
-      }
-    );
-    const d = await r.json();
-    if (!r.ok) throw new Error(`Assets API ${r.status}: ${d.message || JSON.stringify(d).substring(0,80)}`);
-    return d.values || [];
+
+    // If maxResults > 25, paginate
+    if (maxResults <= 25) {
+      const r = await fetch(
+        `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/object/aql`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qlQuery: aql, startAt: 0, maxResults, includeAttributes: true })
+        }
+      );
+      const d = await r.json();
+      if (!r.ok) throw new Error(`Assets API ${r.status}: ${d.message || JSON.stringify(d).substring(0,80)}`);
+      return d.values || [];
+    }
+
+    // Paginate all results
+    const allValues = [];
+    let startAt = 0;
+    const pageSize = 25;
+    let hasMore = true;
+    while (hasMore && allValues.length < maxResults) {
+      const r = await fetch(
+        `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/object/aql`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qlQuery: aql, startAt, maxResults: pageSize, includeAttributes: true })
+        }
+      );
+      const d = await r.json();
+      if (!r.ok) throw new Error(`Assets API ${r.status}: ${d.message || JSON.stringify(d).substring(0,80)}`);
+      allValues.push(...(d.values || []));
+      hasMore = !d.isLast && !d.last && (d.values?.length === pageSize);
+      startAt += pageSize;
+    }
+    return allValues;
   }
 
   // ── Alles Test ───────────────────────────────────────────
@@ -3736,9 +3762,10 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
             window._apCache = await searchAssets('objectType = "Ansprechpartner (Kunde)"', 500);
           }
           const qLow = q.toLowerCase();
-          const objects = (window._apCache || []).filter(o =>
-            (o.label || o.name || '').toLowerCase().includes(qLow)
-          ).slice(0, 8);
+          const objects = (window._apCache || []).filter(o => {
+            const text = (o.label || o.name || '').toLowerCase();
+            return text.includes(qLow);
+          }).slice(0, 8);
           if (!objects.length) {
             sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Keine Ergebnisse für: ${q}</div>`;
             return;
