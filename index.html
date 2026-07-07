@@ -1365,6 +1365,17 @@
       <!-- Selected firma badge -->
       <div id="alles-firma-selected" style="display:none;margin-bottom:14px;padding:8px 12px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);border-radius:8px;font-size:.82rem;color:var(--accent);font-weight:600"></div>
 
+      <!-- Contact search -->
+      <div style="margin-bottom:14px;position:relative" id="alles-kontakt-wrap" style="display:none">
+        <label style="font-size:.68rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">Ansprechpartner suchen</label>
+        <input type="text" id="alles-kontakt-input" autocomplete="off"
+          placeholder="Name oder E-Mail eingeben…"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:var(--font-ui);font-size:.85rem;outline:none;transition:border-color .15s">
+        <div id="alles-kontakt-suggestions"
+          style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--panel);border:1px solid var(--border2);border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+        </div>
+      </div>
+
       <!-- Status / loading -->
       <div id="alles-status" style="font-size:.78rem;color:var(--dim);margin-bottom:10px;min-height:1.2rem"></div>
 
@@ -3468,36 +3479,38 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     document.getElementById('alles-firma-suggestions').style.display = 'none';
     document.getElementById('alles-firma-selected').style.display = 'none';
     document.getElementById('alles-tickets-wrap').style.display = 'none';
-    document.getElementById('alles-status').textContent = 'Lade Organisationen…';
+    document.getElementById('alles-kontakt-input').value = '';
+    document.getElementById('alles-kontakt-suggestions').style.display = 'none';
+    document.getElementById('alles-kontakt-wrap').style.display = '';
+    document.getElementById('alles-status').textContent = 'Lade Firmen…';
     document.getElementById('alles-tickets-body').innerHTML = '';
     _allesSelectedOrg = null;
     openModal('alles-test-modal');
 
-    // Load companies via JQL reporter organisations field
+    // Load companies via customfield_10132 (Customer CMDB field) from recent ESD tickets
     const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
     try {
-      // Get unique reporter companies from recent ESD tickets via JQL
-      const jql = 'project = ESD ORDER BY created DESC';
-      const params = new URLSearchParams({ jql, maxResults: 100, fields: 'organizations,reporter' });
+      const jql = 'project = ESD AND "Customer[Object]" is not EMPTY ORDER BY created DESC';
+      const params = new URLSearchParams({ jql, maxResults: 100, fields: 'customfield_10132,summary' });
       const r = await fetch(
         `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search?${params}`,
         { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
       );
       const d = await r.json();
-      // Extract unique org names from issues
       const orgMap = new Map();
       (d.issues || []).forEach(issue => {
-        const orgs = issue.fields?.organizations || [];
-        orgs.forEach(org => {
-          if (org.id && org.name) orgMap.set(org.id, org.name);
+        const customers = issue.fields?.customfield_10132 || [];
+        customers.forEach(c => {
+          if (c?.objectId && c?.label) orgMap.set(c.objectId, c.label);
+          else if (c?.id && c?.name) orgMap.set(c.id, c.name);
         });
       });
       _allesFirmen = Array.from(orgMap.entries()).map(([id, name]) => ({ id, name }))
         .sort((a,b) => a.name.localeCompare(b.name));
       document.getElementById('alles-status').textContent =
         _allesFirmen.length > 0
-          ? `${_allesFirmen.length} Firmen gefunden – Firma eingeben zum Suchen`
-          : 'Keine Firmen gefunden – versuche Service Desk API Scope hinzuzufügen';
+          ? `${_allesFirmen.length} Firmen geladen – Firma eingeben zum Suchen`
+          : '⚠️ Keine Firmen via Customer-Feld – Tickets ohne Kundenzuordnung? Tippe trotzdem um per JQL zu suchen.';
     } catch(e) {
       document.getElementById('alles-status').textContent = '❌ Fehler: ' + e.message;
     }
@@ -3533,6 +3546,106 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     await loadAllesTickets(id, name);
   });
 
+  // Contact search via Jira user search API
+  let _kontaktSearchTimer = null;
+  document.getElementById('alles-kontakt-input').addEventListener('input', () => {
+    const q = document.getElementById('alles-kontakt-input').value.trim();
+    const sug = document.getElementById('alles-kontakt-suggestions');
+    if (q.length < 2) { sug.style.display = 'none'; return; }
+    clearTimeout(_kontaktSearchTimer);
+    _kontaktSearchTimer = setTimeout(async () => {
+      const token = localStorage.getItem(KEY_JIRA_TOKEN);
+      const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+      if (!token || !cloud) return;
+      try {
+        const params = new URLSearchParams({ query: q, maxResults: 8 });
+        const r = await fetch(
+          `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/user/search?${params}`,
+          { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+        );
+        const users = await r.json();
+        if (!Array.isArray(users) || users.length === 0) { sug.style.display = 'none'; return; }
+        sug.innerHTML = users.map(u => `
+          <div class="alles-kontakt-item"
+            data-account="${u.accountId}"
+            data-name="${(u.displayName||'').replace(/"/g,'&quot;')}"
+            data-email="${(u.emailAddress||'').replace(/"/g,'&quot;')}"
+            style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s"
+            onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">
+            <img src="${u.avatarUrls?.['24x24'] || ''}" width="24" height="24"
+              style="border-radius:50%;flex-shrink:0" onerror="this.style.display='none'">
+            <div>
+              <div style="font-size:.82rem;color:var(--text);font-weight:600">${u.displayName || '–'}</div>
+              <div style="font-size:.7rem;color:var(--dim)">${u.emailAddress || ''}</div>
+            </div>
+          </div>`).join('');
+        sug.style.display = '';
+      } catch(e) { sug.style.display = 'none'; }
+    }, 300);
+  });
+
+  document.getElementById('alles-kontakt-suggestions').addEventListener('click', (e) => {
+    const item = e.target.closest('.alles-kontakt-item');
+    if (!item) return;
+    const name  = item.dataset.name;
+    const email = item.dataset.email;
+    document.getElementById('alles-kontakt-input').value = name;
+    document.getElementById('alles-kontakt-suggestions').style.display = 'none';
+    document.getElementById('alles-status').textContent = `Lade Tickets für ${name}…`;
+    document.getElementById('alles-tickets-wrap').style.display = 'none';
+    // Search tickets by reporter email
+    loadAllesTicketsByContact(email, name);
+  });
+
+  async function loadAllesTicketsByContact(email, name) {
+    const token = localStorage.getItem(KEY_JIRA_TOKEN);
+    const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+    const status = document.getElementById('alles-status');
+    const wrap   = document.getElementById('alles-tickets-wrap');
+    const tbody  = document.getElementById('alles-tickets-body');
+    const count  = document.getElementById('alles-tickets-count');
+    tbody.innerHTML = '';
+    try {
+      const jql = `project = ESD AND reporter = "${email}" ORDER BY created DESC`;
+      const params = new URLSearchParams({ jql, maxResults: 20, fields: 'summary,status,priority,assignee,created' });
+      const r = await fetch(
+        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search?${params}`,
+        { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+      );
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.errorMessages?.join(', ') || `HTTP ${r.status}`);
+      renderTicketRows(d.issues || [], d.total);
+      status.textContent = '';
+      wrap.style.display = '';
+      count.textContent = `${d.total} Tickets von ${name}, zeige ${Math.min(d.total, 20)}`;
+    } catch(e) { status.textContent = '❌ Fehler: ' + e.message; }
+  }
+
+  function renderTicketRows(issues, total) {
+    const tbody = document.getElementById('alles-tickets-body');
+    if (issues.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:16px 12px;text-align:center;color:var(--dim);font-size:.8rem">Keine Tickets gefunden</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = issues.map(i => {
+      const f = i.fields;
+      const prioNum = (f.priority?.name || '').replace('Priorität ','');
+      const prioColor = {'1':'var(--red)','2':'var(--amber)','3':'#e8b339','4':'var(--accent)'}[prioNum] || 'var(--dim)';
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 12px;white-space:nowrap">
+          <a href="https://enthus.atlassian.net/browse/${i.key}" target="_blank"
+            style="color:var(--accent);text-decoration:none;font-weight:600;font-size:.75rem">${i.key}</a>
+        </td>
+        <td style="padding:8px 12px;color:var(--text);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(f.summary||'').replace(/"/g,'')}">${f.summary || '–'}</td>
+        <td style="padding:8px 12px;white-space:nowrap">
+          <span style="padding:2px 8px;border-radius:4px;background:var(--panel2);color:var(--muted);font-size:.7rem">${f.status?.name || '–'}</span>
+        </td>
+        <td style="padding:8px 12px;white-space:nowrap;color:${prioColor};font-size:.75rem;font-weight:700">${f.priority?.name || '–'}</td>
+        <td style="padding:8px 12px;color:var(--muted);font-size:.75rem;white-space:nowrap">${f.assignee?.displayName || '–'}</td>
+      </tr>`;
+    }).join('');
+  }
+
   async function loadAllesTickets(orgId, orgName) {
     const token = localStorage.getItem(KEY_JIRA_TOKEN);
     const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
@@ -3558,27 +3671,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       const issues = d.issues || [];
       count.textContent = `${d.total} Tickets gesamt, zeige ${issues.length}`;
 
-      if (issues.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="padding:16px 12px;text-align:center;color:var(--dim);font-size:.8rem">Keine Tickets gefunden</td></tr>`;
-      } else {
-        tbody.innerHTML = issues.map(i => {
-          const f = i.fields;
-          const prioNum = (f.priority?.name || '').replace('Priorität ','');
-          const prioColor = {'1':'var(--red)','2':'var(--amber)','3':'#e8b339','4':'var(--accent)'}[prioNum] || 'var(--dim)';
-          return `<tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:8px 12px;white-space:nowrap">
-              <a href="https://enthus.atlassian.net/browse/${i.key}" target="_blank"
-                style="color:var(--accent);text-decoration:none;font-weight:600;font-size:.75rem">${i.key}</a>
-            </td>
-            <td style="padding:8px 12px;color:var(--text);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(f.summary||'').replace(/"/g,'')}">${f.summary || '–'}</td>
-            <td style="padding:8px 12px;white-space:nowrap">
-              <span style="padding:2px 8px;border-radius:4px;background:var(--panel2);color:var(--muted);font-size:.7rem">${f.status?.name || '–'}</span>
-            </td>
-            <td style="padding:8px 12px;white-space:nowrap;color:${prioColor};font-size:.75rem;font-weight:700">${f.priority?.name || '–'}</td>
-            <td style="padding:8px 12px;color:var(--muted);font-size:.75rem;white-space:nowrap">${f.assignee?.displayName || '–'}</td>
-          </tr>`;
-        }).join('');
-      }
+      renderTicketRows(issues, d.total);
 
       status.textContent = '';
       wrap.style.display = '';
