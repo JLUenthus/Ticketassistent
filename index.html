@@ -1013,6 +1013,7 @@
         <button class="dev-item" data-test="jira-issue">🐛 Test-Ticket ESD laden</button>
         <button class="dev-item" data-test="jira-assets">🏢 Assets / Firmen laden</button>
         <button class="dev-item" data-test="localstorage">💾 localStorage anzeigen</button>
+        <button class="dev-item" data-test="alles-test">🧪 Alles Test (Firma + Tickets)</button>
       </div>
     </div>
 
@@ -1338,6 +1339,53 @@
       <div class="modal-btns" style="margin-top:14px">
         <button class="btn btn-ghost" id="dev-modal-close">Schließen</button>
         <button class="btn btn-primary" id="dev-modal-run">▶ Test ausführen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL: Alles Test ─────────────────────────────── -->
+  <div class="modal-overlay" id="alles-test-modal">
+    <div class="modal" style="max-width:700px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
+        <button class="btn btn-ghost" id="alles-test-close" style="font-size:.75rem">✕ Schließen</button>
+      </div>
+
+      <!-- Firma Suche -->
+      <div style="margin-bottom:14px;position:relative">
+        <label style="font-size:.68rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">Firma suchen</label>
+        <input type="text" id="alles-firma-input" autocomplete="off"
+          placeholder="Firmenname eingeben…"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:var(--font-ui);font-size:.85rem;outline:none;transition:border-color .15s">
+        <div id="alles-firma-suggestions"
+          style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--panel);border:1px solid var(--border2);border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+        </div>
+      </div>
+
+      <!-- Selected firma badge -->
+      <div id="alles-firma-selected" style="display:none;margin-bottom:14px;padding:8px 12px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);border-radius:8px;font-size:.82rem;color:var(--accent);font-weight:600"></div>
+
+      <!-- Status / loading -->
+      <div id="alles-status" style="font-size:.78rem;color:var(--dim);margin-bottom:10px;min-height:1.2rem"></div>
+
+      <!-- Tickets table -->
+      <div id="alles-tickets-wrap" style="display:none">
+        <div style="font-size:.68rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Aktuelle Tickets</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+          <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+            <thead>
+              <tr style="background:var(--panel2)">
+                <th style="padding:8px 12px;text-align:left;color:var(--dim);font-weight:700;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)">Ticket</th>
+                <th style="padding:8px 12px;text-align:left;color:var(--dim);font-weight:700;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)">Zusammenfassung</th>
+                <th style="padding:8px 12px;text-align:left;color:var(--dim);font-weight:700;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)">Status</th>
+                <th style="padding:8px 12px;text-align:left;color:var(--dim);font-weight:700;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)">Prio</th>
+                <th style="padding:8px 12px;text-align:left;color:var(--dim);font-weight:700;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)">Assignee</th>
+              </tr>
+            </thead>
+            <tbody id="alles-tickets-body"></tbody>
+          </table>
+        </div>
+        <div id="alles-tickets-count" style="font-size:.7rem;color:var(--dim);margin-top:6px;text-align:right"></div>
       </div>
     </div>
   </div>
@@ -3299,6 +3347,10 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         } catch(e) { return { ok: false, text: '❌ Fehler: ' + e.message }; }
       }
     },
+    'alles-test': {
+      label: '🧪 Alles Test',
+      customUI: true
+    },
     'localstorage': {
       label: '💾 localStorage',
       run: async () => {
@@ -3333,6 +3385,10 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     btn.addEventListener('click', () => {
       const key = btn.dataset.test;
       _currentTest = key;
+      if (DEV_TESTS[key]?.customUI) {
+        openAllesTest();
+        return;
+      }
       document.getElementById('dev-modal-name').textContent = DEV_TESTS[key]?.label || key;
       document.getElementById('dev-modal-output').textContent = 'Bereit – klicke ▶ Test ausführen';
       document.getElementById('dev-modal-status').style.display = 'none';
@@ -3371,6 +3427,133 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
   document.getElementById('dev-modal-close').addEventListener('click', () => closeModal('dev-modal'));
   document.getElementById('dev-modal').addEventListener('click', e => {
     if (e.target.id === 'dev-modal') closeModal('dev-modal');
+  });
+
+  // ── Alles Test ───────────────────────────────────────────
+  let _allesFirmen = [];
+  let _allesSelectedOrg = null;
+
+  async function openAllesTest() {
+    const token = localStorage.getItem(KEY_JIRA_TOKEN);
+    if (!token) { showToast('Bitte zuerst Jira verbinden', 'error'); return; }
+
+    // Reset UI
+    document.getElementById('alles-firma-input').value = '';
+    document.getElementById('alles-firma-suggestions').style.display = 'none';
+    document.getElementById('alles-firma-selected').style.display = 'none';
+    document.getElementById('alles-tickets-wrap').style.display = 'none';
+    document.getElementById('alles-status').textContent = 'Lade Organisationen…';
+    document.getElementById('alles-tickets-body').innerHTML = '';
+    _allesSelectedOrg = null;
+    openModal('alles-test-modal');
+
+    // Load organisations from ESD
+    const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+    try {
+      const r = await fetch(
+        `https://api.atlassian.com/ex/jira/${cloud}/rest/servicedeskapi/organization?limit=100`,
+        { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+      );
+      const d = await r.json();
+      _allesFirmen = d.values || [];
+      document.getElementById('alles-status').textContent =
+        _allesFirmen.length > 0
+          ? `${_allesFirmen.length} Organisationen geladen – Firma eingeben zum Suchen`
+          : 'Keine Organisationen gefunden';
+    } catch(e) {
+      document.getElementById('alles-status').textContent = '❌ Fehler: ' + e.message;
+    }
+  }
+
+  // Autocomplete input
+  document.getElementById('alles-firma-input').addEventListener('input', () => {
+    const q = document.getElementById('alles-firma-input').value.trim().toLowerCase();
+    const sug = document.getElementById('alles-firma-suggestions');
+    if (!q || _allesFirmen.length === 0) { sug.style.display = 'none'; return; }
+
+    const matches = _allesFirmen.filter(f => f.name.toLowerCase().includes(q)).slice(0, 8);
+    if (matches.length === 0) { sug.style.display = 'none'; return; }
+
+    sug.innerHTML = matches.map(f =>
+      `<div class="alles-sug-item" data-id="${f.id}" data-name="${f.name.replace(/"/g,'&quot;')}"
+        style="padding:9px 14px;cursor:pointer;color:var(--text);font-size:.82rem;border-bottom:1px solid var(--border);transition:background .1s"
+        onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">${f.name}</div>`
+    ).join('');
+    sug.style.display = '';
+  });
+
+  document.getElementById('alles-firma-suggestions').addEventListener('click', async (e) => {
+    const item = e.target.closest('.alles-sug-item');
+    if (!item) return;
+    const id   = item.dataset.id;
+    const name = item.dataset.name;
+    document.getElementById('alles-firma-input').value = name;
+    document.getElementById('alles-firma-suggestions').style.display = 'none';
+    document.getElementById('alles-firma-selected').textContent = `🏢 ${name}`;
+    document.getElementById('alles-firma-selected').style.display = '';
+    _allesSelectedOrg = { id, name };
+    await loadAllesTickets(id, name);
+  });
+
+  async function loadAllesTickets(orgId, orgName) {
+    const token = localStorage.getItem(KEY_JIRA_TOKEN);
+    const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+    const status = document.getElementById('alles-status');
+    const wrap   = document.getElementById('alles-tickets-wrap');
+    const tbody  = document.getElementById('alles-tickets-body');
+    const count  = document.getElementById('alles-tickets-count');
+
+    status.textContent = `Lade Tickets für ${orgName}…`;
+    wrap.style.display = 'none';
+    tbody.innerHTML = '';
+
+    try {
+      const jql = encodeURIComponent(`project = ESD AND "Organizations" = "${orgName}" ORDER BY created DESC`);
+      const r = await fetch(
+        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search?jql=${jql}&maxResults=20&fields=summary,status,priority,assignee,created`,
+        { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+      );
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.errorMessages?.join(', ') || `HTTP ${r.status}`);
+
+      const issues = d.issues || [];
+      count.textContent = `${d.total} Tickets gesamt, zeige ${issues.length}`;
+
+      if (issues.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:16px 12px;text-align:center;color:var(--dim);font-size:.8rem">Keine Tickets gefunden</td></tr>`;
+      } else {
+        tbody.innerHTML = issues.map(i => {
+          const f = i.fields;
+          const prioNum = (f.priority?.name || '').replace('Priorität ','');
+          const prioColor = {'1':'var(--red)','2':'var(--amber)','3':'#e8b339','4':'var(--accent)'}[prioNum] || 'var(--dim)';
+          return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:8px 12px;white-space:nowrap">
+              <a href="https://enthus.atlassian.net/browse/${i.key}" target="_blank"
+                style="color:var(--accent);text-decoration:none;font-weight:600;font-size:.75rem">${i.key}</a>
+            </td>
+            <td style="padding:8px 12px;color:var(--text);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(f.summary||'').replace(/"/g,'')}">${f.summary || '–'}</td>
+            <td style="padding:8px 12px;white-space:nowrap">
+              <span style="padding:2px 8px;border-radius:4px;background:var(--panel2);color:var(--muted);font-size:.7rem">${f.status?.name || '–'}</span>
+            </td>
+            <td style="padding:8px 12px;white-space:nowrap;color:${prioColor};font-size:.75rem;font-weight:700">${f.priority?.name || '–'}</td>
+            <td style="padding:8px 12px;color:var(--muted);font-size:.75rem;white-space:nowrap">${f.assignee?.displayName || '–'}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      status.textContent = '';
+      wrap.style.display = '';
+    } catch(e) {
+      status.textContent = '❌ Fehler: ' + e.message;
+    }
+  }
+
+  document.getElementById('alles-test-close').addEventListener('click', () => closeModal('alles-test-modal'));
+  document.getElementById('alles-test-modal').addEventListener('click', e => {
+    if (e.target.id === 'alles-test-modal') closeModal('alles-test-modal');
+  });
+  document.getElementById('alles-firma-input').addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.getElementById('alles-firma-suggestions').style.display = 'none';
   });
 
   // ── START ─────────────────────────────────────────────────
