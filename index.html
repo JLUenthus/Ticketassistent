@@ -3490,70 +3490,64 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     // Load companies via customfield_10132 (Customer CMDB field) from recent ESD tickets
     const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
     try {
-      // Simple JQL – just get recent ESD tickets and extract customer field
-      const jql = 'project = ESD ORDER BY created DESC';
-      const params = new URLSearchParams({ jql, maxResults: 100, fields: 'customfield_10132,customfield_10448,summary' });
-      const r = await fetch(
-        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search?${params}`,
-        { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
-      );
-      const d = await r.json();
-
-      if (!r.ok) {
-        // Log raw response to help debug
-        document.getElementById('alles-status').textContent = `❌ API Error ${r.status}: ${JSON.stringify(d).substring(0,100)}`;
-        return;
-      }
-
-      const orgMap = new Map();
-      (d.issues || []).forEach(issue => {
-        const f = issue.fields;
-        // Try customfield_10132 (Customer CMDB array)
-        const customers = f?.customfield_10132 || [];
-        if (Array.isArray(customers)) {
-          customers.forEach(c => {
-            const id   = c?.objectId || c?.id || c?.workspaceId;
-            const name = c?.label    || c?.name || c?.value;
-            if (id && name) orgMap.set(String(id), name);
-          });
-        } else if (customers && typeof customers === 'object') {
-          const id   = customers.objectId || customers.id;
-          const name = customers.label    || customers.name;
-          if (id && name) orgMap.set(String(id), name);
-        }
-        // Fallback: Customer Platzhalter (plain text)
-        const platz = f?.customfield_10448;
-        if (platz && typeof platz === 'string' && platz.trim()) {
-          orgMap.set('platz_' + platz.trim(), platz.trim());
-        }
-      });
-
-      _allesFirmen = Array.from(orgMap.entries()).map(([id, name]) => ({ id, name }))
-        .sort((a,b) => a.name.localeCompare(b.name));
-      document.getElementById('alles-status').textContent =
-        _allesFirmen.length > 0
-          ? `${_allesFirmen.length} Firmen geladen – tippe zum Suchen`
-          : `⚠️ Keine Firmen extrahiert (${d.issues?.length || 0} Tickets geladen) – nutze Ansprechpartner-Suche`;
+      // Firma-Suche: kein Preload nötig – Freitext-JQL bei Eingabe
+      _allesFirmen = [];
+      document.getElementById('alles-status').textContent = 'Firmenname eintippen zum Suchen (mind. 2 Zeichen)';
     } catch(e) {
       document.getElementById('alles-status').textContent = '❌ Fehler: ' + e.message;
     }
   }
 
-  // Autocomplete input
+  // Firma-Suche: live JQL per POST
+  let _firmaSearchTimer = null;
   document.getElementById('alles-firma-input').addEventListener('input', () => {
-    const q = document.getElementById('alles-firma-input').value.trim().toLowerCase();
+    const q = document.getElementById('alles-firma-input').value.trim();
     const sug = document.getElementById('alles-firma-suggestions');
-    if (!q || _allesFirmen.length === 0) { sug.style.display = 'none'; return; }
+    if (q.length < 2) { sug.style.display = 'none'; return; }
+    clearTimeout(_firmaSearchTimer);
+    _firmaSearchTimer = setTimeout(async () => {
+      const token = localStorage.getItem(KEY_JIRA_TOKEN);
+      const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+      if (!token || !cloud) return;
+      try {
+        // Search ESD tickets where summary/description contains the query
+        const r = await fetch(
+          `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search`,
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jql: `project = ESD AND text ~ "${q.replace(/"/g,'')}" ORDER BY created DESC`,
+              maxResults: 10,
+              fields: ['summary', 'customfield_10448', 'customfield_10132']
+            })
+          }
+        );
+        const d = await r.json();
+        if (!r.ok || !d.issues?.length) { sug.style.display = 'none'; return; }
 
-    const matches = _allesFirmen.filter(f => f.name.toLowerCase().includes(q)).slice(0, 8);
-    if (matches.length === 0) { sug.style.display = 'none'; return; }
+        // Extract unique customer names from results
+        const seen = new Map();
+        d.issues.forEach(i => {
+          const platz = i.fields?.customfield_10448;
+          if (platz && typeof platz === 'string') seen.set(platz, platz);
+          const cust = i.fields?.customfield_10132;
+          if (Array.isArray(cust)) cust.forEach(c => { const n = c?.label||c?.name; if(n) seen.set(n,n); });
+        });
 
-    sug.innerHTML = matches.map(f =>
-      `<div class="alles-sug-item" data-id="${f.id}" data-name="${f.name.replace(/"/g,'&quot;')}"
-        style="padding:9px 14px;cursor:pointer;color:var(--text);font-size:.82rem;border-bottom:1px solid var(--border);transition:background .1s"
-        onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">${f.name}</div>`
-    ).join('');
-    sug.style.display = '';
+        // If no customer fields, show issue summaries as fallback
+        const items = seen.size > 0
+          ? Array.from(seen.values()).slice(0, 6)
+          : d.issues.slice(0, 6).map(i => i.fields?.summary || i.key);
+
+        sug.innerHTML = items.map(name =>
+          `<div class="alles-sug-item" data-id="${name}" data-name="${name.replace(/"/g,'&quot;')}"
+            style="padding:9px 14px;cursor:pointer;color:var(--text);font-size:.82rem;border-bottom:1px solid var(--border);transition:background .1s"
+            onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">${name}</div>`
+        ).join('');
+        sug.style.display = '';
+      } catch(e) { sug.style.display = 'none'; }
+    }, 350);
   });
 
   document.getElementById('alles-firma-suggestions').addEventListener('click', async (e) => {
@@ -3629,11 +3623,17 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     const count  = document.getElementById('alles-tickets-count');
     tbody.innerHTML = '';
     try {
-      const jql = `project = ESD AND reporter = "${email}" ORDER BY created DESC`;
-      const params = new URLSearchParams({ jql, maxResults: 20, fields: 'summary,status,priority,assignee,created' });
       const r = await fetch(
-        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search?${params}`,
-        { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jql: `project = ESD AND reporter = "${email}" ORDER BY created DESC`,
+            maxResults: 20,
+            fields: ['summary','status','priority','assignee','created']
+          })
+        }
       );
       const d = await r.json();
       if (!r.ok) throw new Error(d.errorMessages?.join(', ') || `HTTP ${r.status}`);
@@ -3682,11 +3682,17 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     tbody.innerHTML = '';
 
     try {
-      const jql = `project = ESD AND "Organizations" = "${orgName}" ORDER BY created DESC`;
-      const params = new URLSearchParams({ jql, maxResults: 20, fields: 'summary,status,priority,assignee,created' });
       const r = await fetch(
-        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search?${params}`,
-        { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jql: `project = ESD AND text ~ "${orgName.replace(/"/g,'')}" ORDER BY created DESC`,
+            maxResults: 20,
+            fields: ['summary','status','priority','assignee','created']
+          })
+        }
       );
       const d = await r.json();
       if (!r.ok) throw new Error(d.errorMessages?.join(', ') || `HTTP ${r.status}`);
