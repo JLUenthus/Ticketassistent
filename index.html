@@ -3726,16 +3726,61 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     }, 300);
   });
 
-  document.getElementById('alles-kontakt-suggestions').addEventListener('click', (e) => {
+  document.getElementById('alles-kontakt-suggestions').addEventListener('click', async (e) => {
     const item = e.target.closest('.alles-kontakt-item');
     if (!item) return;
-    const name  = item.dataset.name;
-    const email = item.dataset.email;
+    const name    = item.dataset.name;
+    const email   = item.dataset.email;
+    const assetId = item.dataset.account;
     document.getElementById('alles-kontakt-input').value = name;
     document.getElementById('alles-kontakt-suggestions').style.display = 'none';
+
+    // Show contact detail card
+    const token = localStorage.getItem(KEY_JIRA_TOKEN);
+    const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+    const wsId  = await getWorkspaceId();
+    let detailHtml = '';
+    if (wsId && assetId) {
+      try {
+        const r = await fetch(
+          `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/object/${assetId}`,
+          { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+        );
+        const obj = await r.json();
+        const attrs = obj.attributes || [];
+        const get = (label) => attrs.find(a => a.objectTypeAttributeName === label)?.objectAttributeValues?.[0]?.displayValue || '';
+        const telefon   = get('Ansprechpartnernummer');
+        const firma     = get('Firma');
+        const adresse   = get('Adressblock');
+        const anrede    = get('Anrede');
+        const anzeige   = get('Anzeigename') || name;
+
+        detailHtml = `<div style="background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:200px">
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--accent-bg);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:.9rem;color:var(--accent);font-weight:700;flex-shrink:0">${name.charAt(0).toUpperCase()}</div>
+            <div>
+              <div style="font-size:.88rem;font-weight:700;color:var(--text)">${anzeige}</div>
+              <div style="font-size:.72rem;color:var(--muted)">${email}</div>
+              ${firma ? `<div style="font-size:.72rem;color:var(--accent)">🏢 ${firma}</div>` : ''}
+            </div>
+          </div>
+          ${telefon ? `<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:.65rem;font-weight:700;color:var(--dim);text-transform:uppercase">Telefon</span><span style="font-size:.82rem;color:var(--text)">${telefon}</span></div>` : ''}
+          ${adresse ? `<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:.65rem;font-weight:700;color:var(--dim);text-transform:uppercase">Adresse</span><span style="font-size:.75rem;color:var(--muted);white-space:pre-line">${adresse}</span></div>` : ''}
+        </div>`;
+      } catch(e) {}
+    }
+
+    // Insert detail card before status
+    let detailEl = document.getElementById('alles-kontakt-detail');
+    if (!detailEl) {
+      detailEl = document.createElement('div');
+      detailEl.id = 'alles-kontakt-detail';
+      document.getElementById('alles-status').before(detailEl);
+    }
+    detailEl.innerHTML = detailHtml;
+
     document.getElementById('alles-status').textContent = `Lade Tickets für ${name}…`;
     document.getElementById('alles-tickets-wrap').style.display = 'none';
-    // Search tickets by reporter email
     loadAllesTicketsByContact(email, name);
   });
 
