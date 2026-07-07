@@ -1347,7 +1347,10 @@
   <div class="modal-overlay" id="alles-test-modal">
     <div class="modal" style="max-width:780px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v0.4</span>
+        </div>
         <button class="btn btn-ghost" id="alles-test-close" style="font-size:.75rem">✕ Schließen</button>
       </div>
 
@@ -3650,7 +3653,10 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     clearTimeout(_firmaSearchTimer);
     _firmaSearchTimer = setTimeout(async () => {
       try {
-        const aql = `objectType = "Firma (Kunde)" AND Name LIKE "${q.replace(/"/g,'')}" ORDER BY Name ASC`;
+        const isKey = q.toUpperCase().startsWith('KUN');
+        const aql = isKey
+          ? `objectType = "Firma (Kunde)" AND objectKey = "${q}"`
+          : `objectType = "Firma (Kunde)" AND Name LIKE "${q}" ORDER BY Name ASC`;
         const objects = await searchAssets(aql, 8);
         if (!objects.length) { sug.style.display = 'none'; return; }
         sug.innerHTML = objects.map(o => {
@@ -3799,7 +3805,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            jql: `project = ESD AND reporter = "${email}" ORDER BY created DESC`,
+            jql: `project = ESD AND "Customer Contact[Object]" = "${name}" ORDER BY created DESC`,
             maxResults: 20,
             fields: ['summary','status','priority','assignee','created']
           })
