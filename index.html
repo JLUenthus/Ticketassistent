@@ -3512,7 +3512,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       try {
         // Search ESD tickets where summary/description contains the query
         const r = await fetch(
-          `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search`,
+          `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`,
           {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
@@ -3575,9 +3575,9 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
       if (!token || !cloud) return;
       try {
-        const params = new URLSearchParams({ query: q, maxResults: 8 });
+        const params = new URLSearchParams({ query: q, maxResults: 8, project: 'ESD' });
         const r = await fetch(
-          `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/user/search?${params}`,
+          `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/user/assignable/search?${params}`,
           { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
         );
         const users = await r.json();
@@ -3624,7 +3624,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     tbody.innerHTML = '';
     try {
       const r = await fetch(
-        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search`,
+        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
@@ -3683,7 +3683,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
 
     try {
       const r = await fetch(
-        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search`,
+        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
