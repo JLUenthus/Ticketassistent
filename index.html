@@ -3303,20 +3303,28 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
         if (!token || !cloud) return { ok: false, text: '❌ Nicht eingeloggt. Bitte zuerst Jira verbinden.' };
         try {
-          const r = await fetch(`https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/issue/ESD-89816?fields=summary,status,priority,assignee,created`, {
+          const r = await fetch(`https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/issue/ESD-89816`, {
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
           });
           const d = await r.json();
           if (!r.ok) return { ok: false, text: `❌ API Error ${r.status}:\n${JSON.stringify(d, null, 2)}` };
           const f = d.fields;
+          // Find all non-null custom fields
+          const custom = Object.entries(f)
+            .filter(([k,v]) => k.startsWith('customfield_') && v !== null && v !== undefined)
+            .map(([k,v]) => {
+              let val = typeof v === 'object' ? (v?.name || v?.value || v?.displayName || JSON.stringify(v).substring(0,80)) : String(v).substring(0,80);
+              return `${k}: ${val}`;
+            });
           const lines = [
-            `✅ Ticket ESD-89816 geladen`,
-            '',
+            `✅ Ticket ESD-89816`,
             `Titel:     ${f.summary}`,
             `Status:    ${f.status?.name || '–'}`,
             `Priorität: ${f.priority?.name || '–'}`,
-            `Assignee:  ${f.assignee?.displayName || 'Nicht zugewiesen'}`,
-            `Erstellt:  ${f.created ? new Date(f.created).toLocaleString('de-DE') : '–'}`,
+            `Assignee:  ${f.assignee?.displayName || '–'}`,
+            '',
+            '--- Custom Fields (nicht-leer) ---',
+            ...custom
           ];
           return { ok: true, text: lines.join('\n') };
         } catch(e) { return { ok: false, text: '❌ Fehler: ' + e.message }; }
