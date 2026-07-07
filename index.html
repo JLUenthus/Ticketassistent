@@ -1516,7 +1516,7 @@
   // ⚠️ NUR FÜR TESTS – VOR PRODUKTIVBETRIEB ENTFERNEN UND DURCH BACKEND ERSETZEN
   const JIRA_CLIENT_SECRET = 'ATOAY2iBBxmOh7GMQOPfpd_c2EPT5owuCOQhGttI2XYLAcbWC5gT3lkm99psON0JWbd_6C837327';
   const JIRA_CALLBACK    = 'https://jluenthus.github.io/Ticketassistent/';
-  const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me read:jira-user';
+  const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me read:jira-user read:cmdb-object:jira read:servicedesk-request';
   const KEY_NAME   = 'ta_eigenerName';
   const KEY_SESS   = 'ta_sessions';
   const KEY_ACTIVE = 'ta_activeTab';
@@ -3360,26 +3360,50 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       }
     },
     'jira-assets': {
-      label: '🏢 Assets / Firmen (Schema 2, Typ 3)',
+      label: '🏢 Assets / Firmen (AQL)',
       run: async () => {
         const token = localStorage.getItem(KEY_JIRA_TOKEN);
         const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
         if (!token || !cloud) return { ok: false, text: '❌ Nicht eingeloggt. Bitte zuerst Jira verbinden.' };
         try {
-          const r = await fetch(`https://api.atlassian.com/jsm/assets/workspace/${cloud}/v1/object/search`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
-            body: JSON.stringify({ objectSchemaId: '2', objectTypeId: '3', resultsPerPage: 20 })
-          });
-          const d = await r.json();
-          if (!r.ok) return { ok: false, text: `❌ API Error ${r.status}:\n${JSON.stringify(d, null, 2)}` };
-          const objects = d.values || d.objectEntries || [];
-          const lines = [`Status: ${r.status} – ${objects.length} Objekte`, ''];
+          // Step 1: Get Assets workspace ID
+          const wsResp = await fetch(
+            `https://api.atlassian.com/ex/jira/${cloud}/rest/servicedeskapi/assets/workspace`,
+            { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+          );
+          const wsData = await wsResp.json();
+          if (!wsResp.ok) return { ok: false, text: `❌ Workspace API Error ${wsResp.status}:\n${JSON.stringify(wsData, null, 2)}` };
+          const workspaceId = wsData.values?.[0]?.workspaceId;
+          if (!workspaceId) return { ok: false, text: '❌ Keine Workspace-ID gefunden' };
+
+          // Step 2: Search objects via AQL
+          const aqlResp = await fetch(
+            `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${workspaceId}/v1/object/aql`,
+            {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                qlQuery: 'objectType = "Firma" ORDER BY Name ASC',
+                startAt: 0,
+                maxResults: 20,
+                includeAttributes: true
+              })
+            }
+          );
+          const aqlData = await aqlResp.json();
+          if (!aqlResp.ok) return { ok: false, text: `❌ AQL Error ${aqlResp.status}:\n${JSON.stringify(aqlData, null, 2)}` };
+
+          const objects = aqlData.values || [];
+          const lines = [
+            `✅ Workspace ID: ${workspaceId}`,
+            `Objekte gefunden: ${aqlData.total || objects.length}`,
+            ''
+          ];
           objects.slice(0, 15).forEach(o => {
-            const name = o.name || o.label || o.attributes?.find(a => a.objectTypeAttributeName === 'Name')?.objectAttributeValues?.[0]?.value || JSON.stringify(o).substring(0, 60);
+            const name = o.name || o.attributes?.find(a => a.objectTypeAttributeName === 'Name')?.objectAttributeValues?.[0]?.value || o.id;
             lines.push(`• ${name}`);
           });
-          if (objects.length === 0) lines.push('(leer – ggf. falscher Schema/Typ oder kein Scope)');
+          if (objects.length === 0) lines.push('(leer – ggf. falscher objectType-Name in AQL)');
           return { ok: true, text: lines.join('\n') };
         } catch(e) { return { ok: false, text: '❌ Fehler: ' + e.message }; }
       }
@@ -3575,36 +3599,35 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
       if (!token || !cloud) return;
       try {
-        // Search reporters via JQL – only needs read:jira-work
-        const r = await fetch(
-          `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`,
-          {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jql: `project = ESD AND reporter is not EMPTY ORDER BY created DESC`,
-              maxResults: 50,
-              fields: ['reporter']
-            })
-          }
-        );
-        const d = await r.json();
-        if (!r.ok || !d.issues?.length) { sug.style.display = 'none'; return; }
-
-        // Extract unique reporters matching query
-        const seen = new Map();
-        d.issues.forEach(i => {
-          const rep = i.fields?.reporter;
-          if (rep?.accountId && rep?.displayName) {
-            const name  = rep.displayName;
-            const email = rep.emailAddress || '';
-            if (name.toLowerCase().includes(q.toLowerCase()) || email.toLowerCase().includes(q.toLowerCase())) {
-              seen.set(rep.accountId, { accountId: rep.accountId, displayName: name, emailAddress: email, avatar: rep.avatarUrls?.['24x24'] || '' });
+        // Load reporters from cache or fetch fresh
+        if (!window._jiraReporters) {
+          const r = await fetch(
+            `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`,
+            {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jql: 'project = ESD ORDER BY created DESC', maxResults: 100, fields: ['reporter'] })
             }
-          }
-        });
+          );
+          const d = await r.json();
+          const seen = new Map();
+          (d.issues || []).forEach(i => {
+            const rep = i.fields?.reporter;
+            if (rep?.accountId && rep?.displayName) {
+              seen.set(rep.accountId, {
+                accountId: rep.accountId,
+                displayName: rep.displayName,
+                emailAddress: rep.emailAddress || '',
+                avatar: rep.avatarUrls?.['24x24'] || ''
+              });
+            }
+          });
+          window._jiraReporters = Array.from(seen.values());
+        }
 
-        const users = Array.from(seen.values()).slice(0, 8);
+        const users = (window._jiraReporters || [])
+          .filter(u => u.displayName.toLowerCase().includes(q.toLowerCase()) || u.emailAddress.toLowerCase().includes(q.toLowerCase()))
+          .slice(0, 8);
         if (users.length === 0) { sug.style.display = 'none'; return; }
 
         sug.innerHTML = users.map(u => `
