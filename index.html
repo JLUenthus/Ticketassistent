@@ -1516,7 +1516,7 @@
   // ⚠️ NUR FÜR TESTS – VOR PRODUKTIVBETRIEB ENTFERNEN UND DURCH BACKEND ERSETZEN
   const JIRA_CLIENT_SECRET = 'ATOAY2iBBxmOh7GMQOPfpd_c2EPT5owuCOQhGttI2XYLAcbWC5gT3lkm99psON0JWbd_6C837327';
   const JIRA_CALLBACK    = 'https://jluenthus.github.io/Ticketassistent/';
-  const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me read:jira-user read:cmdb-object:jira read:servicedesk-request';
+  const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me read:jira-user read:cmdb-object:jira read:servicedesk-request read:servicedesk:jira-service-management read:servicedesk.organization:jira-service-management';
   const KEY_NAME   = 'ta_eigenerName';
   const KEY_SESS   = 'ta_sessions';
   const KEY_ACTIVE = 'ta_activeTab';
@@ -3366,22 +3366,27 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
         if (!token || !cloud) return { ok: false, text: '❌ Nicht eingeloggt. Bitte zuerst Jira verbinden.' };
         try {
-          // Step 1: Get Assets workspace ID (try both endpoints)
-          let wsResp = await fetch(
+          // Step 1: Get Assets workspace ID – try multiple endpoints and report all results
+          const wsEndpoints = [
             `https://api.atlassian.com/ex/jira/${cloud}/rest/servicedeskapi/assets/workspace`,
-            { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
-          );
-          // Fallback: try insight/workspace
-          if (!wsResp.ok) {
-            wsResp = await fetch(
-              `https://api.atlassian.com/ex/jira/${cloud}/rest/servicedeskapi/insight/workspace`,
-              { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
-            );
+            `https://api.atlassian.com/ex/jira/${cloud}/rest/servicedeskapi/insight/workspace`,
+            `https://api.atlassian.com/jsm/assets/workspace`,
+          ];
+          const wsLines = ['--- Workspace Endpoint Tests ---'];
+          let workspaceId = null;
+          for (const ep of wsEndpoints) {
+            try {
+              const r = await fetch(ep, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+              const d = await r.json();
+              wsLines.push(`${r.status} ${ep.split('/').slice(-2).join('/')}: ${JSON.stringify(d).substring(0, 80)}`);
+              if (r.ok && d.values?.[0]?.workspaceId) {
+                workspaceId = d.values[0].workspaceId;
+                wsLines.push(`✅ Workspace ID gefunden: ${workspaceId}`);
+                break;
+              }
+            } catch(e) { wsLines.push(`❌ ${ep}: ${e.message}`); }
           }
-          const wsData = await wsResp.json();
-          if (!wsResp.ok) return { ok: false, text: `❌ Workspace API Error ${wsResp.status}:\n${JSON.stringify(wsData, null, 2)}` };
-          const workspaceId = wsData.values?.[0]?.workspaceId;
-          if (!workspaceId) return { ok: false, text: '❌ Keine Workspace-ID gefunden' };
+          if (!workspaceId) return { ok: false, text: wsLines.join('\n') };
 
           // Step 2: Search objects via AQL
           const aqlResp = await fetch(
