@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v0.6</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v0.7</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3619,9 +3619,11 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       document.getElementById('alles-status').textContent = 'Firmenname eintippen zum Suchen (mind. 2 Zeichen)';
     // Pre-warm reporter cache
     window._jiraReporters = null;
+    window._apAttrNames = null;
     const token2 = localStorage.getItem(KEY_JIRA_TOKEN);
     const cloud2 = localStorage.getItem(KEY_JIRA_CLOUD);
     if (token2 && cloud2) {
+      // Pre-warm reporters
       fetch(`https://api.atlassian.com/ex/jira/${cloud2}/rest/api/3/search/jql`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token2}`, Accept: 'application/json', 'Content-Type': 'application/json' },
@@ -3663,7 +3665,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         const isKey = q.toUpperCase().startsWith('KUN');
         const aql = isKey
           ? `objectType = "Firma (Kunde)" AND objectKey = "${q}"`
-          : `objectType = "Firma (Kunde)" AND Name LIKE "${q}" ORDER BY Name ASC`;
+          : `objectType = "Firma (Kunde)" AND label LIKE "${q}%" ORDER BY label ASC`;
         const objects = await searchAssets(aql, 8);
         if (!objects.length) { sug.style.display = 'none'; return; }
         sug.innerHTML = objects.map(o => {
@@ -3710,7 +3712,23 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       try {
         // Search Ansprechpartner via Assets AQL
         try {
-          const aql = `objectType = "Ansprechpartner (Kunde)" AND (Name LIKE "${q}" OR "37" LIKE "${q}" OR "38" LIKE "${q}") ORDER BY Name ASC`;
+          // Fetch attribute definitions for Ansprechpartner to get correct names
+          let vornameAttr = 'Vorname';
+          let nachnameAttr = 'Nachname';
+          try {
+            const typeResp = await fetch(
+              `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/objecttypeattribute/search?objectTypeId=3&maxResults=50`,
+              { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+            );
+            const typeData = await typeResp.json();
+            const attrs = typeData.values || typeData || [];
+            // Cache globally
+            window._apAttrNames = {};
+            attrs.forEach(a => { window._apAttrNames[String(a.id)] = a.name; });
+            vornameAttr  = window._apAttrNames['37'] || 'Vorname';
+            nachnameAttr = window._apAttrNames['38'] || 'Nachname';
+          } catch(e) {}
+          const aql = `objectType = "Ansprechpartner (Kunde)" AND (Name LIKE "${q}" OR "${vornameAttr}" LIKE "${q}" OR "${nachnameAttr}" LIKE "${q}") ORDER BY Name ASC`;
           const objects = await searchAssets(aql, 8);
           if (!objects.length) { sug.style.display = 'none'; return; }
           sug.innerHTML = objects.map(o => {
