@@ -1516,7 +1516,7 @@
   // ⚠️ NUR FÜR TESTS – VOR PRODUKTIVBETRIEB ENTFERNEN UND DURCH BACKEND ERSETZEN
   const JIRA_CLIENT_SECRET = 'ATOAY2iBBxmOh7GMQOPfpd_c2EPT5owuCOQhGttI2XYLAcbWC5gT3lkm99psON0JWbd_6C837327';
   const JIRA_CALLBACK    = 'https://jluenthus.github.io/Ticketassistent/';
-  const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me';
+  const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me read:jira-user';
   const KEY_NAME   = 'ta_eigenerName';
   const KEY_SESS   = 'ta_sessions';
   const KEY_ACTIVE = 'ta_activeTab';
@@ -3575,13 +3575,38 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
       if (!token || !cloud) return;
       try {
-        const params = new URLSearchParams({ query: q, maxResults: 8, project: 'ESD' });
+        // Search reporters via JQL – only needs read:jira-work
         const r = await fetch(
-          `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/user/assignable/search?${params}`,
-          { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+          `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`,
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jql: `project = ESD AND reporter is not EMPTY ORDER BY created DESC`,
+              maxResults: 50,
+              fields: ['reporter']
+            })
+          }
         );
-        const users = await r.json();
-        if (!Array.isArray(users) || users.length === 0) { sug.style.display = 'none'; return; }
+        const d = await r.json();
+        if (!r.ok || !d.issues?.length) { sug.style.display = 'none'; return; }
+
+        // Extract unique reporters matching query
+        const seen = new Map();
+        d.issues.forEach(i => {
+          const rep = i.fields?.reporter;
+          if (rep?.accountId && rep?.displayName) {
+            const name  = rep.displayName;
+            const email = rep.emailAddress || '';
+            if (name.toLowerCase().includes(q.toLowerCase()) || email.toLowerCase().includes(q.toLowerCase())) {
+              seen.set(rep.accountId, { accountId: rep.accountId, displayName: name, emailAddress: email, avatar: rep.avatarUrls?.['24x24'] || '' });
+            }
+          }
+        });
+
+        const users = Array.from(seen.values()).slice(0, 8);
+        if (users.length === 0) { sug.style.display = 'none'; return; }
+
         sug.innerHTML = users.map(u => `
           <div class="alles-kontakt-item"
             data-account="${u.accountId}"
@@ -3589,11 +3614,11 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
             data-email="${(u.emailAddress||'').replace(/"/g,'&quot;')}"
             style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s"
             onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">
-            <img src="${u.avatarUrls?.['24x24'] || ''}" width="24" height="24"
+            <img src="${u.avatar}" width="24" height="24"
               style="border-radius:50%;flex-shrink:0" onerror="this.style.display='none'">
             <div>
-              <div style="font-size:.82rem;color:var(--text);font-weight:600">${u.displayName || '–'}</div>
-              <div style="font-size:.7rem;color:var(--dim)">${u.emailAddress || ''}</div>
+              <div style="font-size:.82rem;color:var(--text);font-weight:600">${u.displayName}</div>
+              <div style="font-size:.7rem;color:var(--dim)">${u.emailAddress}</div>
             </div>
           </div>`).join('');
         sug.style.display = '';
