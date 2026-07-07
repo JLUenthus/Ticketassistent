@@ -77,6 +77,47 @@
     }
 
     /* Logo */
+    /* ── Dev Menu ───────────────────────────────────────── */
+    .logo { position: relative; }
+    .logo-btn {
+      display: flex; align-items: center; gap: 8px;
+      background: none; border: none; cursor: pointer; padding: 0;
+      border-radius: 7px; transition: opacity .15s;
+    }
+    .logo-btn:hover { opacity: .8; }
+    .dev-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      z-index: 200;
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      border-radius: var(--r-lg);
+      min-width: 220px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      overflow: hidden;
+    }
+    .dev-dropdown.open { display: block; }
+    .dev-dropdown-header {
+      padding: 8px 14px 6px;
+      font-size: .65rem;
+      font-weight: 700;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      border-bottom: 1px solid var(--border);
+    }
+    .dev-item {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%; padding: 9px 14px;
+      background: none; border: none; cursor: pointer;
+      font-family: var(--font-ui); font-size: .82rem;
+      color: var(--muted); text-align: left;
+      transition: all .12s;
+    }
+    .dev-item:hover { background: var(--panel2); color: var(--text); }
+
     .logo {
       display: flex;
       align-items: center;
@@ -205,6 +246,10 @@
       transition: background .15s;
     }
     .api-status.connected .api-dot { background: var(--green); }
+    .jira-status { border-color: rgba(38,132,255,.35); }
+    .jira-status.connected { border-color: rgba(74,222,128,.3); color: var(--green); }
+    .jira-status .api-dot { background: var(--dim); }
+    .jira-status.connected .api-dot { background: var(--green); }
 
     .cache-btn {
       padding: 4px 10px;
@@ -954,9 +999,21 @@
 
   <!-- ── HEADER ─────────────────────────────────────────── -->
   <header>
-    <div class="logo">
-      <div class="logo-icon">🎫</div>
-      <div class="logo-text">Ticket<span>assistent</span></div>
+    <div class="logo" id="logo-wrap">
+      <button class="logo-btn" id="logo-btn" title="Menü öffnen">
+        <div class="logo-icon">🎫</div>
+        <div class="logo-text">Ticket<span>assistent</span></div>
+      </button>
+      <div class="dev-dropdown" id="dev-dropdown">
+        <div class="dev-dropdown-header">🔧 Entwickler</div>
+        <button class="dev-item" data-test="pkce">🔑 PKCE-Generierung testen</button>
+        <button class="dev-item" data-test="oauth-url">🔗 OAuth-URL prüfen</button>
+        <button class="dev-item" data-test="jira-token">🎫 Jira Token & User</button>
+        <button class="dev-item" data-test="jira-projects">📁 Jira Projekte laden</button>
+        <button class="dev-item" data-test="jira-issue">🐛 Test-Ticket ESD laden</button>
+        <button class="dev-item" data-test="jira-assets">🏢 Assets / Firmen laden</button>
+        <button class="dev-item" data-test="localstorage">💾 localStorage anzeigen</button>
+      </div>
     </div>
 
     <input type="text" id="own-name-input" placeholder="Dein Name (optional)" autocomplete="off">
@@ -969,6 +1026,10 @@
       <button class="api-status" id="api-status-btn">
         <span class="api-dot" id="api-dot"></span>
         <span id="api-status-label">Nicht verbunden – hier klicken zur Anmeldung</span>
+      </button>
+      <button class="api-status jira-status" id="jira-status-btn" title="Mit Jira verbinden">
+        <span class="api-dot" id="jira-dot"></span>
+        <span id="jira-status-label">Jira – nicht verbunden</span>
       </button>
       <button class="cache-btn" id="backup-btn" style="border-color:var(--border2);color:var(--muted)">💾 Backup</button>
       <button class="cache-btn" id="cache-btn">Cache leeren ⌫</button>
@@ -1262,6 +1323,25 @@
     </div>
   </div>
 
+  <!-- ── MODAL: Dev Tests ──────────────────────────────── -->
+  <div class="modal-overlay" id="dev-modal">
+    <div class="modal" style="max-width:640px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="modal-title" style="margin:0">🔧 Entwickler-Test</div>
+        <span id="dev-modal-name" style="font-size:.72rem;color:var(--dim)"></span>
+      </div>
+      <div id="dev-modal-status" style="display:none;margin-bottom:10px;padding:7px 12px;border-radius:7px;font-size:.78rem;font-weight:600"></div>
+      <div id="dev-modal-output"
+        style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-family:var(--font-mono);font-size:.75rem;line-height:1.6;color:var(--muted);min-height:120px;max-height:380px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">
+        Ergebnis erscheint hier…
+      </div>
+      <div class="modal-btns" style="margin-top:14px">
+        <button class="btn btn-ghost" id="dev-modal-close">Schließen</button>
+        <button class="btn btn-primary" id="dev-modal-run">▶ Test ausführen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── MODAL: Cache leeren ────────────────────────────── -->
   <div class="modal-overlay" id="cache-modal">
     <div class="modal">
@@ -1370,6 +1450,12 @@
 
   // ── Storage Keys ────────────────────────────────────────
   const KEY_API    = 'ta_apiKey';
+  const KEY_JIRA_TOKEN   = 'ta_jiraToken';
+  const KEY_JIRA_CLOUD   = 'ta_jiraCloudId';
+  const KEY_JIRA_USER    = 'ta_jiraUser';
+  const JIRA_CLIENT_ID   = 'ebfyOvhQso8SieLHc5ymMnsKkAD4sp1G';
+  const JIRA_CALLBACK    = 'https://jluenthus.github.io/Ticketassistent/';
+  const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me offline_access';
   const KEY_NAME   = 'ta_eigenerName';
   const KEY_SESS   = 'ta_sessions';
   const KEY_ACTIVE = 'ta_activeTab';
@@ -1395,6 +1481,8 @@
 
     // API status
     updateApiStatus();
+    updateJiraStatus();
+    handleJiraCallback();
 
     // Render tabs
     renderTabs();
@@ -2340,6 +2428,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     renderTabs();
     showEmpty();
     updateApiStatus();
+    updateJiraStatus();
     showToast('Cache geleert ✓');
   });
 
@@ -2933,6 +3022,345 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       // Fallback plain text
       copyToClipboard(plainRow).then(() => showToast('Als Text kopiert (HTML nicht unterstützt)'));
     }
+  });
+
+  // ── Jira OAuth (PKCE) ────────────────────────────────────
+  function generatePKCE() {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    const verifier = btoa(String.fromCharCode(...array))
+      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
+      .then(buf => {
+        const challenge = btoa(String.fromCharCode(...new Uint8Array(buf)))
+          .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+        return { verifier, challenge };
+      });
+  }
+
+  function updateJiraStatus() {
+    const token = localStorage.getItem(KEY_JIRA_TOKEN);
+    const user  = localStorage.getItem(KEY_JIRA_USER);
+    const btn   = document.getElementById('jira-status-btn');
+    const lbl   = document.getElementById('jira-status-label');
+    const dot   = document.getElementById('jira-dot');
+    if (token) {
+      btn.classList.add('connected');
+      lbl.textContent = user ? `Jira: ${user}` : 'Jira verbunden';
+      dot.style.background = 'var(--green)';
+    } else {
+      btn.classList.remove('connected');
+      lbl.textContent = 'Jira – anmelden';
+      dot.style.background = 'var(--dim)';
+    }
+  }
+
+  async function startJiraLogin() {
+    const state = crypto.randomUUID();
+    const { verifier, challenge } = await generatePKCE();
+    localStorage.setItem('ta_jira_verifier', verifier);
+    localStorage.setItem('ta_jira_state', state);
+    const url = `https://auth.atlassian.com/authorize?`
+      + `audience=api.atlassian.com`
+      + `&client_id=${JIRA_CLIENT_ID}`
+      + `&scope=${encodeURIComponent(JIRA_SCOPES)}`
+      + `&redirect_uri=${encodeURIComponent(JIRA_CALLBACK)}`
+      + `&state=${state}`
+      + `&response_type=code`
+      + `&prompt=consent`
+      + `&code_challenge=${challenge}`
+      + `&code_challenge_method=S256`;
+    window.location.href = url;
+  }
+
+  async function handleJiraCallback() {
+    const params = new URLSearchParams(window.location.search);
+    const code  = params.get('code');
+    const state = params.get('state');
+    if (!code) return;
+
+    const savedState    = localStorage.getItem('ta_jira_state');
+    const codeVerifier  = localStorage.getItem('ta_jira_verifier');
+    if (state !== savedState) { showToast('Jira Login fehlgeschlagen – State mismatch', 'error'); return; }
+
+    // Clean URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    try {
+      // Exchange code for token
+      const resp = await fetch('https://auth.atlassian.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          grant_type: 'authorization_code',
+          client_id: JIRA_CLIENT_ID,
+          code,
+          redirect_uri: JIRA_CALLBACK,
+          code_verifier: codeVerifier
+        })
+      });
+      const data = await resp.json();
+      if (!data.access_token) throw new Error(data.error_description || 'Kein Token erhalten');
+
+      localStorage.setItem(KEY_JIRA_TOKEN, data.access_token);
+      if (data.refresh_token) localStorage.setItem('ta_jira_refresh', data.refresh_token);
+
+      // Fetch user info
+      const meResp = await fetch('https://api.atlassian.com/me', {
+        headers: { Authorization: `Bearer ${data.access_token}`, Accept: 'application/json' }
+      });
+      const me = await meResp.json();
+      const displayName = me.name || me.email || 'Jira-User';
+      localStorage.setItem(KEY_JIRA_USER, displayName);
+
+      // Fetch accessible resources (cloud ID)
+      const resResp = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+        headers: { Authorization: `Bearer ${data.access_token}`, Accept: 'application/json' }
+      });
+      const resources = await resResp.json();
+      if (resources.length > 0) localStorage.setItem(KEY_JIRA_CLOUD, resources[0].id);
+
+      localStorage.removeItem('ta_jira_verifier');
+      localStorage.removeItem('ta_jira_state');
+
+      updateJiraStatus();
+      showToast(`Jira verbunden als ${displayName} ✓`);
+    } catch(err) {
+      showToast('Jira Login fehlgeschlagen: ' + err.message, 'error');
+    }
+  }
+
+  document.getElementById('jira-status-btn').addEventListener('click', () => {
+    const token = localStorage.getItem(KEY_JIRA_TOKEN);
+    if (token) {
+      // Already connected – show disconnect option
+      if (confirm(`Jira-Verbindung trennen?`)) {
+        localStorage.removeItem(KEY_JIRA_TOKEN);
+        localStorage.removeItem(KEY_JIRA_CLOUD);
+        localStorage.removeItem(KEY_JIRA_USER);
+        localStorage.removeItem('ta_jira_refresh');
+        updateJiraStatus();
+        showToast('Jira-Verbindung getrennt');
+      }
+    } else {
+      startJiraLogin();
+    }
+  });
+
+  // ── Dev Menu & Tests ─────────────────────────────────────
+  let _currentTest = null;
+
+  const DEV_TESTS = {
+    'pkce': {
+      label: '🔑 PKCE-Generierung',
+      run: async () => {
+        const { verifier, challenge } = await generatePKCE();
+        const lines = [
+          '✅ PKCE erfolgreich generiert',
+          '',
+          `code_verifier (${verifier.length} Zeichen):`,
+          verifier,
+          '',
+          `code_challenge (SHA-256, Base64url):`,
+          challenge,
+          '',
+          `Länge OK: ${verifier.length >= 43 && verifier.length <= 128 ? '✅' : '❌'} (muss 43-128 sein)`,
+          `Zeichen OK: ${/^[A-Za-z0-9_-]+$/.test(verifier) ? '✅' : '❌'} (nur A-Z a-z 0-9 _ -)`,
+        ];
+        return { ok: true, text: lines.join('\n') };
+      }
+    },
+    'oauth-url': {
+      label: '🔗 OAuth-URL Aufbau',
+      run: async () => {
+        const state = crypto.randomUUID();
+        const { verifier, challenge } = await generatePKCE();
+        const url = new URL('https://auth.atlassian.com/authorize');
+        url.searchParams.set('audience', 'api.atlassian.com');
+        url.searchParams.set('client_id', JIRA_CLIENT_ID);
+        url.searchParams.set('scope', JIRA_SCOPES);
+        url.searchParams.set('redirect_uri', JIRA_CALLBACK);
+        url.searchParams.set('state', state);
+        url.searchParams.set('response_type', 'code');
+        url.searchParams.set('prompt', 'consent');
+        url.searchParams.set('code_challenge', challenge);
+        url.searchParams.set('code_challenge_method', 'S256');
+
+        const required = ['audience','client_id','scope','redirect_uri','state','response_type','code_challenge','code_challenge_method'];
+        const checks = required.map(p => `${url.searchParams.has(p) ? '✅' : '❌'} ${p}: ${url.searchParams.get(p)?.substring(0,60) || 'FEHLT'}`);
+
+        return { ok: true, text: 'OAuth-URL Parameterprüfung:\n\n' + checks.join('\n') + '\n\n--- Vollständige URL ---\n' + url.toString() };
+      }
+    },
+    'jira-token': {
+      label: '🎫 Jira Token & User',
+      run: async () => {
+        const token = localStorage.getItem(KEY_JIRA_TOKEN);
+        const user  = localStorage.getItem(KEY_JIRA_USER);
+        const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+        if (!token) return { ok: false, text: '❌ Kein Jira-Token gefunden.\nBitte zuerst oben rechts "Jira – anmelden" klicken.' };
+
+        const lines = [
+          `✅ Token vorhanden (${token.length} Zeichen)`,
+          `👤 User: ${user || '(nicht gespeichert)'}`,
+          `☁️  Cloud-ID: ${cloud || '(nicht gespeichert)'}`,
+          '',
+          '--- /me API Test ---'
+        ];
+        try {
+          const r = await fetch('https://api.atlassian.com/me', {
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+          });
+          const d = await r.json();
+          lines.push(`Status: ${r.status} ${r.ok ? '✅' : '❌'}`);
+          lines.push(`Name: ${d.name || d.displayName || '–'}`);
+          lines.push(`Email: ${d.email || '–'}`);
+          lines.push(`Account-ID: ${d.account_id || '–'}`);
+        } catch(e) { lines.push('❌ API-Fehler: ' + e.message); }
+        return { ok: true, text: lines.join('\n') };
+      }
+    },
+    'jira-projects': {
+      label: '📁 Jira Projekte',
+      run: async () => {
+        const token = localStorage.getItem(KEY_JIRA_TOKEN);
+        const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+        if (!token || !cloud) return { ok: false, text: '❌ Nicht eingeloggt. Bitte zuerst Jira verbinden.' };
+        try {
+          const r = await fetch(`https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/project/search?maxResults=20`, {
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+          });
+          const d = await r.json();
+          if (!r.ok) return { ok: false, text: `❌ API Error ${r.status}:\n${JSON.stringify(d, null, 2)}` };
+          const lines = [`✅ ${d.total} Projekte gefunden (zeige erste ${d.values?.length || 0})`, ''];
+          (d.values || []).forEach(p => lines.push(`[${p.key}] ${p.name} (${p.projectTypeKey})`));
+          return { ok: true, text: lines.join('\n') };
+        } catch(e) { return { ok: false, text: '❌ Fehler: ' + e.message }; }
+      }
+    },
+    'jira-issue': {
+      label: '🐛 Test-Ticket ESD-89816',
+      run: async () => {
+        const token = localStorage.getItem(KEY_JIRA_TOKEN);
+        const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+        if (!token || !cloud) return { ok: false, text: '❌ Nicht eingeloggt. Bitte zuerst Jira verbinden.' };
+        try {
+          const r = await fetch(`https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/issue/ESD-89816?fields=summary,status,priority,assignee,created`, {
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+          });
+          const d = await r.json();
+          if (!r.ok) return { ok: false, text: `❌ API Error ${r.status}:\n${JSON.stringify(d, null, 2)}` };
+          const f = d.fields;
+          const lines = [
+            `✅ Ticket ESD-89816 geladen`,
+            '',
+            `Titel:     ${f.summary}`,
+            `Status:    ${f.status?.name || '–'}`,
+            `Priorität: ${f.priority?.name || '–'}`,
+            `Assignee:  ${f.assignee?.displayName || 'Nicht zugewiesen'}`,
+            `Erstellt:  ${f.created ? new Date(f.created).toLocaleString('de-DE') : '–'}`,
+          ];
+          return { ok: true, text: lines.join('\n') };
+        } catch(e) { return { ok: false, text: '❌ Fehler: ' + e.message }; }
+      }
+    },
+    'jira-assets': {
+      label: '🏢 Assets / Firmen (Schema 2, Typ 3)',
+      run: async () => {
+        const token = localStorage.getItem(KEY_JIRA_TOKEN);
+        const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+        if (!token || !cloud) return { ok: false, text: '❌ Nicht eingeloggt. Bitte zuerst Jira verbinden.' };
+        try {
+          const r = await fetch(`https://api.atlassian.com/jsm/assets/workspace/${cloud}/v1/object/search`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ objectSchemaId: '2', objectTypeId: '3', resultsPerPage: 20 })
+          });
+          const d = await r.json();
+          if (!r.ok) return { ok: false, text: `❌ API Error ${r.status}:\n${JSON.stringify(d, null, 2)}` };
+          const objects = d.values || d.objectEntries || [];
+          const lines = [`Status: ${r.status} – ${objects.length} Objekte`, ''];
+          objects.slice(0, 15).forEach(o => {
+            const name = o.name || o.label || o.attributes?.find(a => a.objectTypeAttributeName === 'Name')?.objectAttributeValues?.[0]?.value || JSON.stringify(o).substring(0, 60);
+            lines.push(`• ${name}`);
+          });
+          if (objects.length === 0) lines.push('(leer – ggf. falscher Schema/Typ oder kein Scope)');
+          return { ok: true, text: lines.join('\n') };
+        } catch(e) { return { ok: false, text: '❌ Fehler: ' + e.message }; }
+      }
+    },
+    'localstorage': {
+      label: '💾 localStorage',
+      run: async () => {
+        const keys = ['ta_apiKey','ta_eigenerName','ta_sessions','ta_activeTab',
+                      KEY_JIRA_TOKEN, KEY_JIRA_CLOUD, KEY_JIRA_USER,
+                      'ta_jira_refresh','ta_jira_verifier','ta_jira_state'];
+        const lines = ['localStorage Inhalt:\n'];
+        keys.forEach(k => {
+          let val = localStorage.getItem(k);
+          if (!val) { lines.push(`${k}: (leer)`); return; }
+          if (k === KEY_JIRA_TOKEN || k === 'ta_jira_refresh') val = val.substring(0,30) + '… (' + val.length + ' Zeichen)';
+          if (k === 'ta_sessions') { try { val = `[${JSON.parse(val).length} Sessions]`; } catch{} }
+          if (k === 'ta_apiKey') val = val.substring(0,12) + '…';
+          lines.push(`${k}: ${val}`);
+        });
+        return { ok: true, text: lines.join('\n') };
+      }
+    }
+  };
+
+  // Logo dropdown toggle
+  document.getElementById('logo-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('dev-dropdown').classList.toggle('open');
+  });
+  document.addEventListener('click', () => {
+    document.getElementById('dev-dropdown').classList.remove('open');
+  });
+
+  // Test item click → open modal
+  document.querySelectorAll('.dev-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.test;
+      _currentTest = key;
+      document.getElementById('dev-modal-name').textContent = DEV_TESTS[key]?.label || key;
+      document.getElementById('dev-modal-output').textContent = 'Bereit – klicke ▶ Test ausführen';
+      document.getElementById('dev-modal-status').style.display = 'none';
+      openModal('dev-modal');
+    });
+  });
+
+  // Run test
+  document.getElementById('dev-modal-run').addEventListener('click', async () => {
+    if (!_currentTest || !DEV_TESTS[_currentTest]) return;
+    const btn = document.getElementById('dev-modal-run');
+    const out = document.getElementById('dev-modal-output');
+    const statusEl = document.getElementById('dev-modal-status');
+    btn.disabled = true; btn.textContent = '⏳ Läuft…';
+    out.textContent = 'Test läuft…';
+    statusEl.style.display = 'none';
+    try {
+      const result = await DEV_TESTS[_currentTest].run();
+      out.textContent = result.text;
+      statusEl.style.display = '';
+      statusEl.textContent = result.ok ? '✅ Test erfolgreich' : '❌ Test fehlgeschlagen';
+      statusEl.style.background = result.ok ? 'var(--green-bg)' : 'var(--red-bg)';
+      statusEl.style.border = result.ok ? '1px solid rgba(74,222,128,.3)' : '1px solid rgba(248,113,113,.3)';
+      statusEl.style.color = result.ok ? 'var(--green)' : 'var(--red)';
+    } catch(e) {
+      out.textContent = '❌ Unerwarteter Fehler:\n' + e.message;
+      statusEl.style.display = '';
+      statusEl.textContent = '❌ Fehler';
+      statusEl.style.background = 'var(--red-bg)';
+      statusEl.style.border = '1px solid rgba(248,113,113,.3)';
+      statusEl.style.color = 'var(--red)';
+    }
+    btn.disabled = false; btn.textContent = '▶ Test ausführen';
+  });
+
+  document.getElementById('dev-modal-close').addEventListener('click', () => closeModal('dev-modal'));
+  document.getElementById('dev-modal').addEventListener('click', e => {
+    if (e.target.id === 'dev-modal') closeModal('dev-modal');
   });
 
   // ── START ─────────────────────────────────────────────────
