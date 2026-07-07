@@ -3366,11 +3366,18 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
         if (!token || !cloud) return { ok: false, text: '❌ Nicht eingeloggt. Bitte zuerst Jira verbinden.' };
         try {
-          // Step 1: Get Assets workspace ID
-          const wsResp = await fetch(
+          // Step 1: Get Assets workspace ID (try both endpoints)
+          let wsResp = await fetch(
             `https://api.atlassian.com/ex/jira/${cloud}/rest/servicedeskapi/assets/workspace`,
             { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
           );
+          // Fallback: try insight/workspace
+          if (!wsResp.ok) {
+            wsResp = await fetch(
+              `https://api.atlassian.com/ex/jira/${cloud}/rest/servicedeskapi/insight/workspace`,
+              { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+            );
+          }
           const wsData = await wsResp.json();
           if (!wsResp.ok) return { ok: false, text: `❌ Workspace API Error ${wsResp.status}:\n${JSON.stringify(wsData, null, 2)}` };
           const workspaceId = wsData.values?.[0]?.workspaceId;
@@ -3517,6 +3524,35 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       // Firma-Suche: kein Preload nötig – Freitext-JQL bei Eingabe
       _allesFirmen = [];
       document.getElementById('alles-status').textContent = 'Firmenname eintippen zum Suchen (mind. 2 Zeichen)';
+    // Pre-warm reporter cache
+    window._jiraReporters = null;
+    const token2 = localStorage.getItem(KEY_JIRA_TOKEN);
+    const cloud2 = localStorage.getItem(KEY_JIRA_CLOUD);
+    if (token2 && cloud2) {
+      fetch(`https://api.atlassian.com/ex/jira/${cloud2}/rest/api/3/search/jql`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token2}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jql: 'project = ESD ORDER BY created DESC', maxResults: 100, fields: ['reporter'] })
+      }).then(r => r.json()).then(d => {
+        const seen = new Map();
+        (d.issues || []).forEach(i => {
+          const rep = i.fields?.reporter;
+          if (rep?.accountId && rep?.displayName) {
+            seen.set(rep.accountId, {
+              accountId: rep.accountId,
+              displayName: rep.displayName,
+              emailAddress: rep.emailAddress || '',
+              avatar: rep.avatarUrls?.['24x24'] || ''
+            });
+          }
+        });
+        window._jiraReporters = Array.from(seen.values());
+        document.getElementById('alles-status').textContent =
+          `Bereit · ${window._jiraReporters.length} Ansprechpartner geladen`;
+      }).catch(e => {
+        document.getElementById('alles-status').textContent = '⚠️ Reporter-Cache: ' + e.message;
+      });
+    }
     } catch(e) {
       document.getElementById('alles-status').textContent = '❌ Fehler: ' + e.message;
     }
@@ -3599,30 +3635,11 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
       if (!token || !cloud) return;
       try {
-        // Load reporters from cache or fetch fresh
-        if (!window._jiraReporters) {
-          const r = await fetch(
-            `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`,
-            {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
-              body: JSON.stringify({ jql: 'project = ESD ORDER BY created DESC', maxResults: 100, fields: ['reporter'] })
-            }
-          );
-          const d = await r.json();
-          const seen = new Map();
-          (d.issues || []).forEach(i => {
-            const rep = i.fields?.reporter;
-            if (rep?.accountId && rep?.displayName) {
-              seen.set(rep.accountId, {
-                accountId: rep.accountId,
-                displayName: rep.displayName,
-                emailAddress: rep.emailAddress || '',
-                avatar: rep.avatarUrls?.['24x24'] || ''
-              });
-            }
-          });
-          window._jiraReporters = Array.from(seen.values());
+        // Use pre-warmed cache
+        if (!window._jiraReporters || window._jiraReporters.length === 0) {
+          sug.innerHTML = '<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Noch laden… bitte kurz warten</div>';
+          sug.style.display = '';
+          return;
         }
 
         const users = (window._jiraReporters || [])
