@@ -1345,11 +1345,44 @@
 
   <!-- ── MODAL: Alles Test ─────────────────────────────── -->
   <div class="modal-overlay" id="alles-test-modal">
-    <div class="modal" style="max-width:700px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div class="modal" style="max-width:780px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
         <button class="btn btn-ghost" id="alles-test-close" style="font-size:.75rem">✕ Schließen</button>
       </div>
+
+      <!-- Schnellfilter -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:.68rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">⚡ Schnellansichten</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap" id="alles-quickfilter">
+          <button class="alles-qf-btn" data-jql="project = ESD AND issuetype = &quot;[System] Incident&quot; AND status != Done ORDER BY priority ASC" data-label="🔴 Offene Incidents"
+            style="padding:5px 12px;border-radius:6px;border:1px solid rgba(248,113,113,.35);background:var(--red-bg);color:var(--red);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);transition:all .15s">
+            🔴 Offene Incidents
+          </button>
+          <button class="alles-qf-btn" data-jql="project = ESD AND issuetype = &quot;Monitoring Event&quot; AND status != Done ORDER BY created DESC" data-label="📊 Monitoring Events"
+            style="padding:5px 12px;border-radius:6px;border:1px solid rgba(251,191,36,.35);background:var(--amber-bg);color:var(--amber);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);transition:all .15s">
+            📊 Monitoring Events
+          </button>
+          <button class="alles-qf-btn" data-jql="project = ESD AND assignee = currentUser() AND status != Done ORDER BY priority ASC" data-label="👤 Meine Tickets"
+            style="padding:5px 12px;border-radius:6px;border:1px solid rgba(124,140,248,.35);background:var(--accent-bg);color:var(--accent);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);transition:all .15s">
+            👤 Meine Tickets
+          </button>
+          <button class="alles-qf-btn" data-jql="project = ESD AND created >= startOfDay() ORDER BY created DESC" data-label="🕐 Heute erstellt"
+            style="padding:5px 12px;border-radius:6px;border:1px solid rgba(74,222,128,.35);background:var(--green-bg);color:var(--green);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);transition:all .15s">
+            🕐 Heute erstellt
+          </button>
+          <button class="alles-qf-btn" data-jql="project = ESD AND status = &quot;Warten auf Kunden&quot; ORDER BY updated ASC" data-label="⏳ Warten auf Kunden"
+            style="padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:var(--panel2);color:var(--muted);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);transition:all .15s">
+            ⏳ Warten auf Kunden
+          </button>
+          <button class="alles-qf-btn" data-jql="project = ESD AND priority = &quot;Priorität 1&quot; AND status != Done ORDER BY created DESC" data-label="🚨 Priorität 1"
+            style="padding:5px 12px;border-radius:6px;border:1px solid rgba(248,113,113,.5);background:rgba(248,113,113,.2);color:var(--red);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);transition:all .15s">
+            🚨 Priorität 1
+          </button>
+        </div>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin-bottom:14px"></div>
 
       <!-- Firma Suche -->
       <div style="margin-bottom:14px;position:relative">
@@ -3388,34 +3421,38 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           }
           if (!workspaceId) return { ok: false, text: wsLines.join('\n') };
 
-          // Step 2: Search objects via AQL
+          // Step 2: List all object types in schema 2
+          const typesResp = await fetch(
+            `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${workspaceId}/v1/objecttype/search?objectSchemaId=2&maxResults=50`,
+            { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+          );
+          const typesData = await typesResp.json();
+
+          const lines = [`✅ Workspace ID: ${workspaceId}`, '', '--- Objekttypen in Schema 2 ---'];
+          const types = typesData.values || typesData || [];
+          if (Array.isArray(types) && types.length > 0) {
+            types.forEach(t => lines.push(`[${t.id}] ${t.name} (${t.objectCount || 0} Objekte)`));
+          } else {
+            lines.push('(keine Typen gefunden – Schema ID prüfen)');
+            lines.push('Raw: ' + JSON.stringify(typesData).substring(0, 200));
+          }
+
+          // Step 3: Try a generic AQL to get any objects
           const aqlResp = await fetch(
             `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${workspaceId}/v1/object/aql`,
             {
               method: 'POST',
               headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                qlQuery: 'objectType = "Firma" ORDER BY Name ASC',
-                startAt: 0,
-                maxResults: 20,
-                includeAttributes: true
-              })
+              body: JSON.stringify({ qlQuery: 'objectTypeId = 3', startAt: 0, maxResults: 5, includeAttributes: true })
             }
           );
           const aqlData = await aqlResp.json();
-          if (!aqlResp.ok) return { ok: false, text: `❌ AQL Error ${aqlResp.status}:\n${JSON.stringify(aqlData, null, 2)}` };
-
-          const objects = aqlData.values || [];
-          const lines = [
-            `✅ Workspace ID: ${workspaceId}`,
-            `Objekte gefunden: ${aqlData.total || objects.length}`,
-            ''
-          ];
-          objects.slice(0, 15).forEach(o => {
-            const name = o.name || o.attributes?.find(a => a.objectTypeAttributeName === 'Name')?.objectAttributeValues?.[0]?.value || o.id;
+          lines.push('', `--- AQL objectTypeId=3: ${aqlData.total || 0} Objekte ---`);
+          (aqlData.values || []).slice(0, 5).forEach(o => {
+            const name = o.name || o.attributes?.find(a => a.objectTypeAttributeName === 'Name')?.objectAttributeValues?.[0]?.displayValue || o.id;
             lines.push(`• ${name}`);
           });
-          if (objects.length === 0) lines.push('(leer – ggf. falscher objectType-Name in AQL)');
+
           return { ok: true, text: lines.join('\n') };
         } catch(e) { return { ok: false, text: '❌ Fehler: ' + e.message }; }
       }
@@ -3778,6 +3815,47 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       status.textContent = '❌ Fehler: ' + e.message;
     }
   }
+
+  // Quick filter buttons
+  document.getElementById('alles-quickfilter').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.alles-qf-btn');
+    if (!btn) return;
+    const jql   = btn.dataset.jql;
+    const label = btn.dataset.label;
+
+    // Highlight active button
+    document.querySelectorAll('.alles-qf-btn').forEach(b => b.style.outline = '');
+    btn.style.outline = '2px solid currentColor';
+
+    const token = localStorage.getItem(KEY_JIRA_TOKEN);
+    const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+    if (!token || !cloud) { showToast('Bitte zuerst Jira verbinden', 'error'); return; }
+
+    document.getElementById('alles-status').textContent = `Lade ${label}…`;
+    document.getElementById('alles-tickets-wrap').style.display = 'none';
+    document.getElementById('alles-firma-selected').style.display = 'none';
+
+    try {
+      const r = await fetch(
+        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jql, maxResults: 25, fields: ['summary','status','priority','assignee','created'] })
+        }
+      );
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.errorMessages?.join(', ') || `HTTP ${r.status}`);
+      renderTicketRows(d.issues || [], d.total);
+      document.getElementById('alles-tickets-count').textContent = `${d.total} Tickets, zeige ${Math.min(d.total, 25)}`;
+      document.getElementById('alles-status').textContent = '';
+      document.getElementById('alles-tickets-wrap').style.display = '';
+      // Update table header label
+      document.querySelector('#alles-tickets-wrap div:first-child').textContent = label;
+    } catch(e) {
+      document.getElementById('alles-status').textContent = '❌ ' + e.message;
+    }
+  });
 
   document.getElementById('alles-test-close').addEventListener('click', () => closeModal('alles-test-modal'));
   document.getElementById('alles-test-modal').addEventListener('click', e => {
