@@ -3447,19 +3447,30 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     _allesSelectedOrg = null;
     openModal('alles-test-modal');
 
-    // Load organisations from ESD
+    // Load companies via JQL reporter organisations field
     const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
     try {
+      // Get unique reporter companies from recent ESD tickets via JQL
+      const jql = encodeURIComponent('project = ESD ORDER BY created DESC');
       const r = await fetch(
-        `https://api.atlassian.com/ex/jira/${cloud}/rest/servicedeskapi/organization?limit=100`,
+        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search?jql=${jql}&maxResults=100&fields=organizations,reporter`,
         { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
       );
       const d = await r.json();
-      _allesFirmen = d.values || [];
+      // Extract unique org names from issues
+      const orgMap = new Map();
+      (d.issues || []).forEach(issue => {
+        const orgs = issue.fields?.organizations || [];
+        orgs.forEach(org => {
+          if (org.id && org.name) orgMap.set(org.id, org.name);
+        });
+      });
+      _allesFirmen = Array.from(orgMap.entries()).map(([id, name]) => ({ id, name }))
+        .sort((a,b) => a.name.localeCompare(b.name));
       document.getElementById('alles-status').textContent =
         _allesFirmen.length > 0
-          ? `${_allesFirmen.length} Organisationen geladen – Firma eingeben zum Suchen`
-          : 'Keine Organisationen gefunden';
+          ? `${_allesFirmen.length} Firmen gefunden – Firma eingeben zum Suchen`
+          : 'Keine Firmen gefunden – versuche Service Desk API Scope hinzuzufügen';
     } catch(e) {
       document.getElementById('alles-status').textContent = '❌ Fehler: ' + e.message;
     }
