@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v1.6</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v1.7</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3620,6 +3620,8 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       document.getElementById('alles-status').textContent = 'Firmenname eintippen zum Suchen (mind. 2 Zeichen)';
     // Pre-warm reporter cache
     window._jiraReporters = null;
+    window._apCache = null;
+    window._firmaCache = null;
     window._apAttrNames = null;
     const token2 = localStorage.getItem(KEY_JIRA_TOKEN);
     const cloud2 = localStorage.getItem(KEY_JIRA_CLOUD);
@@ -3663,20 +3665,22 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     clearTimeout(_firmaSearchTimer);
     _firmaSearchTimer = setTimeout(async () => {
       try {
-        const isKey = q.toUpperCase().startsWith('KUN');
-        const aql = isKey
-          ? `objectType = "Firma (Kunde)" AND objectKey = "${q}"`
-          : `objectType = "Firma (Kunde)" AND label LIKE "${q}*" ORDER BY label ASC`;
-        // DEBUG
-        sug.innerHTML = `<div style="padding:6px 14px;color:var(--dim);font-size:.7rem;font-family:var(--font-mono)">🔍 AQL: ${aql}</div>`;
-        sug.style.display = '';
-        const objects = await searchAssets(aql, 8);
-        if (!objects.length) {
-          sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Keine Ergebnisse für: ${q}</div>`;
-          return;
+        // Load and cache all Firma objects once, filter client-side
+        if (!window._firmaCache) {
+          window._firmaCache = await searchAssets('objectType = "Firma (Kunde)"', 500);
         }
+        const qLow = q.toLowerCase();
+        const isKey = q.toUpperCase().startsWith('KUN');
+        const objects = (window._firmaCache || []).filter(o => {
+          const label = (o.label || o.name || '').toLowerCase();
+          const key   = (o.objectKey || '').toLowerCase();
+          return isKey ? key.includes(qLow) : label.includes(qLow);
+        }).slice(0, 8);
+        // Remove debug div
+        sug.innerHTML = '';
+        if (!objects.length) { sug.style.display = 'none'; return; }
         sug.innerHTML = objects.map(o => {
-          const name = o.name || o.attributes?.find(a => a.objectTypeAttributeName === 'Name')?.objectAttributeValues?.[0]?.displayValue || o.id;
+          const name = o.label || o.name || o.id;
           return `<div class="alles-sug-item" data-id="${o.id}" data-name="${String(name).replace(/"/g,'&quot;')}"
             style="display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;color:var(--text);font-size:.82rem;border-bottom:1px solid var(--border);transition:background .1s"
             onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">
@@ -3717,19 +3721,24 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
       if (!token || !cloud) return;
       try {
-        // Search Ansprechpartner via Assets AQL – simple Name LIKE (v0.7 style)
+        // Search Ansprechpartner – load all and filter client-side (Assets AQL has no text search)
         try {
           const wsId = await getWorkspaceId();
           if (!wsId) {
-            sug.innerHTML = `<div style="padding:9px 14px;color:var(--red);font-size:.78rem">❌ Workspace ID nicht verfügbar – bitte Jira neu verbinden</div>`;
+            sug.innerHTML = `<div style="padding:9px 14px;color:var(--red);font-size:.78rem">❌ Workspace ID nicht verfügbar</div>`;
             sug.style.display = '';
             return;
           }
-          const aql = `objectType = "Ansprechpartner (Kunde)" AND label LIKE "${q}*" ORDER BY label ASC`;
-          // DEBUG – zeigt wsId und AQL
-          sug.innerHTML = `<div style="padding:6px 14px;color:var(--dim);font-size:.7rem;font-family:var(--font-mono)">wsId: ${wsId}<br>AQL: ${aql}</div>`;
-          sug.style.display = '';
-          const objects = await searchAssets(aql, 8);
+          // Load and cache all Ansprechpartner once
+          if (!window._apCache) {
+            sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">⏳ Lade Kontakte…</div>`;
+            sug.style.display = '';
+            window._apCache = await searchAssets('objectType = "Ansprechpartner (Kunde)"', 500);
+          }
+          const qLow = q.toLowerCase();
+          const objects = (window._apCache || []).filter(o =>
+            (o.label || o.name || '').toLowerCase().includes(qLow)
+          ).slice(0, 8);
           if (!objects.length) {
             sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Keine Ergebnisse für: ${q}</div>`;
             return;
