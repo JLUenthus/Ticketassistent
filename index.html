@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v1.1</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v1.2</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3666,7 +3666,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         const isKey = q.toUpperCase().startsWith('KUN');
         const aql = isKey
           ? `objectType = "Firma (Kunde)" AND objectKey = "${q}"`
-          : `objectType = "Firma (Kunde)" AND (label LIKE "${q}%" OR "Name" LIKE "${q}%") ORDER BY label ASC`;
+          : `objectType = "Firma (Kunde)" AND label LIKE "${q}%" ORDER BY label ASC`;
         const objects = await searchAssets(aql, 8);
         if (!objects.length) { sug.style.display = 'none'; return; }
         sug.innerHTML = objects.map(o => {
@@ -3720,7 +3720,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
             sug.style.display = '';
             return;
           }
-          const aql = `objectType = "Ansprechpartner (Kunde)" AND Name LIKE "${qTrimmed}%" ORDER BY Name ASC`;
+          const aql = `objectType = "Ansprechpartner (Kunde)" AND label LIKE "${qTrimmed}%" ORDER BY label ASC`;
           const objects = await searchAssets(aql, 8);
           if (!objects.length) { sug.style.display = 'none'; return; }
           sug.innerHTML = objects.map(o => {
@@ -3820,7 +3820,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            jql: `project = ESD AND ("Customer Contact[Object]" = "${name}" OR "Letzter Kundenkommentar - User" = "${name}") ORDER BY created DESC`,
+            jql: `project = ESD AND "Customer Contact[Object]" = "${name}" ORDER BY created DESC`,
             maxResults: 20,
             fields: ['summary','status','priority','assignee','created']
           })
