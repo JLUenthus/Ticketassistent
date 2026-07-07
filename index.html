@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v0.5</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v0.6</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3567,6 +3567,11 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     return null;
   }
 
+  function getAttr(obj, attrId) {
+    const a = (obj.attributes || []).find(a => String(a.objectTypeAttributeId) === String(attrId));
+    return a?.objectAttributeValues?.[0]?.displayValue || a?.objectAttributeValues?.[0]?.value || '';
+  }
+
   async function searchAssets(aql, maxResults = 10) {
     const token = localStorage.getItem(KEY_JIRA_TOKEN);
     const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
@@ -3705,22 +3710,22 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       try {
         // Search Ansprechpartner via Assets AQL
         try {
-          const aql = `objectType = "Ansprechpartner (Kunde)" AND Name LIKE "${q.replace(/"/g,'')}" ORDER BY Name ASC`;
+          const aql = `objectType = "Ansprechpartner (Kunde)" AND (Name LIKE "${q}" OR "37" LIKE "${q}" OR "38" LIKE "${q}") ORDER BY Name ASC`;
           const objects = await searchAssets(aql, 8);
           if (!objects.length) { sug.style.display = 'none'; return; }
           sug.innerHTML = objects.map(o => {
-            const name  = o.name || '';
-            const email = o.attributes?.find(a => a.objectTypeAttributeName === 'E-Mail')?.objectAttributeValues?.[0]?.displayValue || '';
-            const firma = o.attributes?.find(a => a.objectTypeAttributeName === 'Firma (Kunde)')?.objectAttributeValues?.[0]?.displayValue || '';
+            const anzeige = getAttr(o, 31) || o.name || '';
+            const email   = getAttr(o, 45);
+            const firma   = getAttr(o, 40);
             return `<div class="alles-kontakt-item"
               data-account="${o.id}"
-              data-name="${name.replace(/"/g,'&quot;')}"
+              data-name="${anzeige.replace(/"/g,'&quot;')}"
               data-email="${email.replace(/"/g,'&quot;')}"
               style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s"
               onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">
-              <div style="width:28px;height:28px;border-radius:50%;background:var(--accent-bg);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--accent);font-weight:700;flex-shrink:0">${name.charAt(0).toUpperCase()}</div>
+              <div style="width:28px;height:28px;border-radius:50%;background:var(--accent-bg);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--accent);font-weight:700;flex-shrink:0">${(anzeige||'?').charAt(0).toUpperCase()}</div>
               <div>
-                <div style="font-size:.82rem;color:var(--text);font-weight:600">${name}</div>
+                <div style="font-size:.82rem;color:var(--text);font-weight:600">${anzeige}</div>
                 <div style="font-size:.7rem;color:var(--dim)">${email}${firma ? ' · ' + firma : ''}</div>
               </div>
             </div>`;
@@ -3755,13 +3760,11 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
         );
         const obj = await r.json();
-        const attrs = obj.attributes || [];
-        const get = (label) => attrs.find(a => a.objectTypeAttributeName === label)?.objectAttributeValues?.[0]?.displayValue || '';
-        const telefon   = get('Ansprechpartnernummer');
-        const firma     = get('Firma');
-        const adresse   = get('Adressblock');
-        const anrede    = get('Anrede');
-        const anzeige   = get('Anzeigename') || name;
+        // Use attribute IDs (objectTypeAttributeId) since names come as undefined
+        const telefon = getAttr(obj, 122); // Ansprechpartnernummer
+        const firma   = getAttr(obj, 40);  // Firma (Kundenname)
+        const adresse = getAttr(obj, 192); // Adressblock
+        const anzeige = getAttr(obj, 31) || name; // Anzeigename
 
         detailHtml = `<div style="background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:200px">
