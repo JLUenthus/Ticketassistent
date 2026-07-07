@@ -3443,7 +3443,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
             {
               method: 'POST',
               headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
-              body: JSON.stringify({ qlQuery: 'objectTypeId = 3', startAt: 0, maxResults: 5, includeAttributes: true })
+              body: JSON.stringify({ qlQuery: 'objectType = "Firma (Kunde)" ORDER BY Name ASC', startAt: 0, maxResults: 10, includeAttributes: true })
             }
           );
           const aqlData = await aqlResp.json();
@@ -3539,6 +3539,47 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     if (e.target.id === 'dev-modal') closeModal('dev-modal');
   });
 
+  // ── Jira Assets helpers ──────────────────────────────────
+  let _jiraWorkspaceId = null;
+
+  async function getWorkspaceId() {
+    if (_jiraWorkspaceId) return _jiraWorkspaceId;
+    const token = localStorage.getItem(KEY_JIRA_TOKEN);
+    const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+    for (const ep of [
+      `https://api.atlassian.com/ex/jira/${cloud}/rest/servicedeskapi/assets/workspace`,
+      `https://api.atlassian.com/ex/jira/${cloud}/rest/servicedeskapi/insight/workspace`
+    ]) {
+      try {
+        const r = await fetch(ep, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+        const d = await r.json();
+        if (r.ok && d.values?.[0]?.workspaceId) {
+          _jiraWorkspaceId = d.values[0].workspaceId;
+          return _jiraWorkspaceId;
+        }
+      } catch(e) {}
+    }
+    return null;
+  }
+
+  async function searchAssets(aql, maxResults = 10) {
+    const token = localStorage.getItem(KEY_JIRA_TOKEN);
+    const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+    const wsId  = await getWorkspaceId();
+    if (!wsId) throw new Error('Workspace ID nicht verfügbar');
+    const r = await fetch(
+      `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/object/aql`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qlQuery: aql, startAt: 0, maxResults, includeAttributes: true })
+      }
+    );
+    const d = await r.json();
+    if (!r.ok) throw new Error(`Assets API ${r.status}: ${d.message || JSON.stringify(d).substring(0,80)}`);
+    return d.values || [];
+  }
+
   // ── Alles Test ───────────────────────────────────────────
   let _allesFirmen = [];
   let _allesSelectedOrg = null;
@@ -3600,7 +3641,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     }
   }
 
-  // Firma-Suche: live JQL per POST
+  // Firma-Suche: Assets AQL
   let _firmaSearchTimer = null;
   document.getElementById('alles-firma-input').addEventListener('input', () => {
     const q = document.getElementById('alles-firma-input').value.trim();
@@ -3608,47 +3649,24 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     if (q.length < 2) { sug.style.display = 'none'; return; }
     clearTimeout(_firmaSearchTimer);
     _firmaSearchTimer = setTimeout(async () => {
-      const token = localStorage.getItem(KEY_JIRA_TOKEN);
-      const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
-      if (!token || !cloud) return;
       try {
-        // Search ESD tickets where summary/description contains the query
-        const r = await fetch(
-          `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`,
-          {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jql: `project = ESD AND text ~ "${q.replace(/"/g,'')}" ORDER BY created DESC`,
-              maxResults: 10,
-              fields: ['summary', 'customfield_10448', 'customfield_10132']
-            })
-          }
-        );
-        const d = await r.json();
-        if (!r.ok || !d.issues?.length) { sug.style.display = 'none'; return; }
-
-        // Extract unique customer names from results
-        const seen = new Map();
-        d.issues.forEach(i => {
-          const platz = i.fields?.customfield_10448;
-          if (platz && typeof platz === 'string') seen.set(platz, platz);
-          const cust = i.fields?.customfield_10132;
-          if (Array.isArray(cust)) cust.forEach(c => { const n = c?.label||c?.name; if(n) seen.set(n,n); });
-        });
-
-        // If no customer fields, show issue summaries as fallback
-        const items = seen.size > 0
-          ? Array.from(seen.values()).slice(0, 6)
-          : d.issues.slice(0, 6).map(i => i.fields?.summary || i.key);
-
-        sug.innerHTML = items.map(name =>
-          `<div class="alles-sug-item" data-id="${name}" data-name="${name.replace(/"/g,'&quot;')}"
-            style="padding:9px 14px;cursor:pointer;color:var(--text);font-size:.82rem;border-bottom:1px solid var(--border);transition:background .1s"
-            onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">${name}</div>`
-        ).join('');
+        const aql = `objectType = "Firma (Kunde)" AND Name LIKE "${q.replace(/"/g,'')}" ORDER BY Name ASC`;
+        const objects = await searchAssets(aql, 8);
+        if (!objects.length) { sug.style.display = 'none'; return; }
+        sug.innerHTML = objects.map(o => {
+          const name = o.name || o.attributes?.find(a => a.objectTypeAttributeName === 'Name')?.objectAttributeValues?.[0]?.displayValue || o.id;
+          return `<div class="alles-sug-item" data-id="${o.id}" data-name="${String(name).replace(/"/g,'&quot;')}"
+            style="display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;color:var(--text);font-size:.82rem;border-bottom:1px solid var(--border);transition:background .1s"
+            onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">
+            <span style="font-size:.7rem;color:var(--dim);font-family:var(--font-mono)">${o.objectKey || ''}</span>
+            <span>${name}</span>
+          </div>`;
+        }).join('');
         sug.style.display = '';
-      } catch(e) { sug.style.display = 'none'; }
+      } catch(e) {
+        sug.innerHTML = `<div style="padding:9px 14px;color:var(--red);font-size:.78rem">❌ ${e.message}</div>`;
+        sug.style.display = '';
+      }
     }, 350);
   });
 
@@ -3677,33 +3695,33 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
       if (!token || !cloud) return;
       try {
-        // Use pre-warmed cache
-        if (!window._jiraReporters || window._jiraReporters.length === 0) {
-          sug.innerHTML = '<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Noch laden… bitte kurz warten</div>';
+        // Search Ansprechpartner via Assets AQL
+        try {
+          const aql = `objectType = "Ansprechpartner (Kunde)" AND Name LIKE "${q.replace(/"/g,'')}" ORDER BY Name ASC`;
+          const objects = await searchAssets(aql, 8);
+          if (!objects.length) { sug.style.display = 'none'; return; }
+          sug.innerHTML = objects.map(o => {
+            const name  = o.name || '';
+            const email = o.attributes?.find(a => a.objectTypeAttributeName === 'E-Mail')?.objectAttributeValues?.[0]?.displayValue || '';
+            const firma = o.attributes?.find(a => a.objectTypeAttributeName === 'Firma (Kunde)')?.objectAttributeValues?.[0]?.displayValue || '';
+            return `<div class="alles-kontakt-item"
+              data-account="${o.id}"
+              data-name="${name.replace(/"/g,'&quot;')}"
+              data-email="${email.replace(/"/g,'&quot;')}"
+              style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s"
+              onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">
+              <div style="width:28px;height:28px;border-radius:50%;background:var(--accent-bg);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--accent);font-weight:700;flex-shrink:0">${name.charAt(0).toUpperCase()}</div>
+              <div>
+                <div style="font-size:.82rem;color:var(--text);font-weight:600">${name}</div>
+                <div style="font-size:.7rem;color:var(--dim)">${email}${firma ? ' · ' + firma : ''}</div>
+              </div>
+            </div>`;
+          }).join('');
           sug.style.display = '';
-          return;
+        } catch(e) {
+          sug.innerHTML = `<div style="padding:9px 14px;color:var(--red);font-size:.78rem">❌ ${e.message}</div>`;
+          sug.style.display = '';
         }
-
-        const users = (window._jiraReporters || [])
-          .filter(u => u.displayName.toLowerCase().includes(q.toLowerCase()) || u.emailAddress.toLowerCase().includes(q.toLowerCase()))
-          .slice(0, 8);
-        if (users.length === 0) { sug.style.display = 'none'; return; }
-
-        sug.innerHTML = users.map(u => `
-          <div class="alles-kontakt-item"
-            data-account="${u.accountId}"
-            data-name="${(u.displayName||'').replace(/"/g,'&quot;')}"
-            data-email="${(u.emailAddress||'').replace(/"/g,'&quot;')}"
-            style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s"
-            onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">
-            <img src="${u.avatar}" width="24" height="24"
-              style="border-radius:50%;flex-shrink:0" onerror="this.style.display='none'">
-            <div>
-              <div style="font-size:.82rem;color:var(--text);font-weight:600">${u.displayName}</div>
-              <div style="font-size:.7rem;color:var(--dim)">${u.emailAddress}</div>
-            </div>
-          </div>`).join('');
-        sug.style.display = '';
       } catch(e) { sug.style.display = 'none'; }
     }, 300);
   });
@@ -3795,9 +3813,9 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            jql: `project = ESD AND text ~ "${orgName.replace(/"/g,'')}" ORDER BY created DESC`,
+            jql: `project = ESD AND "Customer[Object]" = "${orgName.replace(/"/g,'')}" ORDER BY created DESC`,
             maxResults: 20,
-            fields: ['summary','status','priority','assignee','created']
+            fields: ['summary','status','priority','assignee','created','reporter']
           })
         }
       );
