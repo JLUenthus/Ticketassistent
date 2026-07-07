@@ -3316,6 +3316,24 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
               let val = typeof v === 'object' ? (v?.name || v?.value || v?.displayName || JSON.stringify(v).substring(0,80)) : String(v).substring(0,80);
               return `${k}: ${val}`;
             });
+          // Also fetch field metadata to get labels
+          let fieldMeta = {};
+          try {
+            const fm = await fetch(`https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/field`, {
+              headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+            });
+            const fmData = await fm.json();
+            fmData.forEach(field => { fieldMeta[field.id] = field.name; });
+          } catch(e) {}
+
+          const customWithLabels = Object.entries(f)
+            .filter(([k,v]) => k.startsWith('customfield_') && v !== null && v !== undefined)
+            .map(([k,v]) => {
+              const label = fieldMeta[k] ? `${fieldMeta[k]} (${k})` : k;
+              let val = typeof v === 'object' ? (v?.name || v?.value || v?.displayName || JSON.stringify(v).substring(0,60)) : String(v).substring(0,60);
+              return `${label}: ${val}`;
+            });
+
           const lines = [
             `✅ Ticket ESD-89816`,
             `Titel:     ${f.summary}`,
@@ -3323,8 +3341,8 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
             `Priorität: ${f.priority?.name || '–'}`,
             `Assignee:  ${f.assignee?.displayName || '–'}`,
             '',
-            '--- Custom Fields (nicht-leer) ---',
-            ...custom
+            '--- Custom Fields mit Labels ---',
+            ...customWithLabels
           ];
           return { ok: true, text: lines.join('\n') };
         } catch(e) { return { ok: false, text: '❌ Fehler: ' + e.message }; }
@@ -3459,9 +3477,10 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
     try {
       // Get unique reporter companies from recent ESD tickets via JQL
-      const jql = encodeURIComponent('project = ESD ORDER BY created DESC');
+      const jql = 'project = ESD ORDER BY created DESC';
+      const params = new URLSearchParams({ jql, maxResults: 100, fields: 'organizations,reporter' });
       const r = await fetch(
-        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search?jql=${jql}&maxResults=100&fields=organizations,reporter`,
+        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search?${params}`,
         { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
       );
       const d = await r.json();
@@ -3527,9 +3546,10 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     tbody.innerHTML = '';
 
     try {
-      const jql = encodeURIComponent(`project = ESD AND "Organizations" = "${orgName}" ORDER BY created DESC`);
+      const jql = `project = ESD AND "Organizations" = "${orgName}" ORDER BY created DESC`;
+      const params = new URLSearchParams({ jql, maxResults: 20, fields: 'summary,status,priority,assignee,created' });
       const r = await fetch(
-        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search?jql=${jql}&maxResults=20&fields=summary,status,priority,assignee,created`,
+        `https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search?${params}`,
         { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
       );
       const d = await r.json();
