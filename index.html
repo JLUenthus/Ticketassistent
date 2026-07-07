@@ -3422,9 +3422,15 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           lines.push('--- Firma (Kunde) – Attributnamen ---');
           if (firma1) {
             lines.push(`Name: ${firma1.name} | Key: ${firma1.objectKey}`);
+            // Dump first attribute raw to find correct property names
+            if (firma1.attributes?.length > 0) {
+              lines.push('RAW first attr keys: ' + Object.keys(firma1.attributes[0]).join(', '));
+              lines.push('RAW first attr: ' + JSON.stringify(firma1.attributes[0]).substring(0, 200));
+            }
             (firma1.attributes || []).forEach(a => {
-              const val = a.objectAttributeValues?.[0]?.displayValue || a.objectAttributeValues?.[0]?.value || '';
-              lines.push(`  "${a.objectTypeAttributeName}" = ${String(val).substring(0,50)}`);
+              const attrName = a.objectTypeAttributeName || a.name || a.attributeName || a.id || '?';
+              const val = a.objectAttributeValues?.[0]?.displayValue || a.objectAttributeValues?.[0]?.value || a.values?.[0] || '';
+              lines.push(`  "${attrName}" = ${String(val).substring(0,50)}`);
             });
           }
 
@@ -3442,9 +3448,13 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           lines.push('--- Ansprechpartner (Kunde) – Attributnamen ---');
           if (ap1) {
             lines.push(`Name: ${ap1.name} | Key: ${ap1.objectKey}`);
+            if (ap1.attributes?.length > 0) {
+              lines.push('RAW first attr keys: ' + Object.keys(ap1.attributes[0]).join(', '));
+            }
             (ap1.attributes || []).forEach(a => {
-              const val = a.objectAttributeValues?.[0]?.displayValue || a.objectAttributeValues?.[0]?.value || '';
-              lines.push(`  "${a.objectTypeAttributeName}" = ${String(val).substring(0,50)}`);
+              const attrName = a.objectTypeAttributeName || a.name || a.attributeName || a.id || '?';
+              const val = a.objectAttributeValues?.[0]?.displayValue || a.objectAttributeValues?.[0]?.value || a.values?.[0] || '';
+              lines.push(`  "${attrName}" = ${String(val).substring(0,50)}`);
             });
           }
 
