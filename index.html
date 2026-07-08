@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v3.5</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v3.6</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -4214,13 +4214,25 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
             }).join('')}
           </div>`;
       } else if (tab === 'confluence') {
+        // Get Confluence cloud ID (may differ from Jira cloud ID)
+        let confCloudId = cloud;
+        try {
+          const resResp = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+          });
+          const resources = await resResp.json();
+          const confResource = resources.find(r => r.scopes?.some(s => s.includes('confluence')) || r.url?.includes('atlassian.net'));
+          if (confResource) confCloudId = confResource.id;
+        } catch(e) {}
+
         // Search Confluence for BRRS pages
+        const cql = encodeURIComponent('text ~ "BRRS" AND type = page ORDER BY lastmodified DESC');
         const confResp = await fetch(
-          `https://api.atlassian.com/ex/confluence/${cloud}/wiki/rest/api/content/search?cql=text~"BRRS" AND type=page ORDER BY lastmodified DESC&limit=15&expand=history.lastUpdated,space`,
+          `https://api.atlassian.com/ex/confluence/${confCloudId}/wiki/rest/api/content/search?cql=${cql}&limit=15&expand=history.lastUpdated,space`,
           { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
         );
         const confData = await confResp.json();
-        if (!confResp.ok) throw new Error(confData.message || `HTTP ${confResp.status}`);
+        if (!confResp.ok) throw new Error(confData.message || `HTTP ${confResp.status}: ${JSON.stringify(confData).substring(0,100)}`);
         const pages = confData.results || [];
         if (!pages.length) { content.innerHTML = '<div style="color:var(--dim)">Keine Confluence-Seiten gefunden</div>'; return; }
         content.innerHTML = `
