@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v4.0</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v4.3</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3776,24 +3776,49 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
         const wsId  = await getWorkspaceId();
         const qLow  = q.toLowerCase();
-        // Get the 25 available firms from cache and filter
+
+        // Demo-Liste bekannter Kunden (hardcoded für Präsentation)
+        // Mit Gateway: alle 5333 Firmen durchsuchbar
+        const DEMO_FIRMEN = [
+          { id: '38869', objectKey: 'KUN-38869', label: 'BRRS Rechtsanwälte' },
+          { id: null,    objectKey: null,         label: 'east-end' },
+          { id: null,    objectKey: null,         label: 'decisio' },
+        ];
+
+        // Filter demo list first
+        const demoFound = DEMO_FIRMEN.filter(o => o.label.toLowerCase().includes(qLow));
+
+        // Also check API cache
         const cached = Object.values(window._firmaPageCache || {})[0] || [];
-        const found  = cached.filter(o => (o.label||'').toLowerCase().includes(qLow)).slice(0, 8);
+        const cacheFound = cached.filter(o =>
+          (o.label||'').toLowerCase().includes(qLow) &&
+          !demoFound.some(d => d.label.toLowerCase() === (o.label||'').toLowerCase())
+        );
+
+        const found = [...demoFound, ...cacheFound].slice(0, 8);
+
         sug.innerHTML = '';
         if (!found.length) {
-          sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Nicht in Schnellauswahl – tippe KUN-XXXXX für direktes Lookup</div>`;
+          sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Nicht gefunden · <span style="color:var(--accent)">Mit Gateway: alle 5333 Firmen</span></div>`;
           sug.style.display = '';
           return;
         }
         sug.innerHTML = found.map(o => {
-          const name = o.label || o.id;
-          return `<div class="alles-sug-item" data-id="${o.id}" data-name="${String(name).replace(/"/g,'&quot;')}"
+          const name    = o.label || o.id;
+          const isDemo  = !o.objectKey || DEMO_FIRMEN.some(d => d.label === o.label);
+          const keySpan = o.objectKey
+            ? `<span style="font-size:.7rem;color:var(--dim);font-family:var(--font-mono)">${o.objectKey}</span>`
+            : `<span style="font-size:.68rem;color:var(--accent);font-style:italic">Demo</span>`;
+          return `<div class="alles-sug-item" data-id="${o.id || o.label}" data-name="${String(name).replace(/"/g,'&quot;')}"
             style="display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;color:var(--text);font-size:.82rem;border-bottom:1px solid var(--border);transition:background .1s"
             onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">
-            <span style="font-size:.7rem;color:var(--dim);font-family:var(--font-mono)">${o.objectKey || ''}</span>
+            ${keySpan}
             <span>${name}</span>
           </div>`;
         }).join('');
+
+        // Show gateway hint at bottom
+        sug.innerHTML += `<div style="padding:6px 14px;font-size:.65rem;color:var(--dim);border-top:1px solid var(--border);font-style:italic">💡 Mit Gateway: alle 5333 Firmen durchsuchbar</div>`;
         sug.style.display = '';
       } catch(e) {
         sug.innerHTML = `<div style="padding:9px 14px;color:var(--red);font-size:.78rem">❌ ${e.message}</div>`;
@@ -4225,10 +4250,26 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           body: JSON.stringify({ jql, maxResults: 25, fields: ['summary','status','priority','assignee','created','customfield_10504'] })
         });
         const d = await r.json();
+
+        // Debug info
+        const debugHtml = `<details style="margin-bottom:10px;font-size:.7rem;color:var(--dim)">
+          <summary style="cursor:pointer;font-weight:700">🔍 Debug – JQL & Response</summary>
+          <div style="margin-top:6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;font-family:var(--font-mono);white-space:pre-wrap;font-size:.68rem;max-height:150px;overflow-y:auto">JQL: ${jql}
+
+Status: ${r.status}
+Total: ${d.total ?? 'undefined'}
+Issues: ${d.issues?.length ?? 0}
+ErrorMessages: ${JSON.stringify(d.errorMessages || [])}
+WarningMessages: ${JSON.stringify(d.warningMessages || [])}</div>
+        </details>`;
+
         if (!r.ok) throw new Error(d.errorMessages?.join(', ') || `HTTP ${r.status}`);
         const issues = d.issues || [];
-        if (!issues.length) { content.innerHTML = '<div style="color:var(--green);font-size:.82rem">✅ Keine abgelaufenen SLAs</div>'; return; }
-        content.innerHTML = `
+        if (!issues.length) {
+          content.innerHTML = debugHtml + '<div style="color:var(--green);font-size:.82rem">✅ Keine abgelaufenen SLAs mit diesem Filter</div>';
+          return;
+        }
+        content.innerHTML = debugHtml + `
           <div style="margin-bottom:6px;font-size:.7rem;color:var(--red);font-weight:700">⚠️ ${d.total} Tickets mit abgelaufener Reaktionszeit</div>
           <table style="width:100%;border-collapse:collapse;font-size:.75rem">
             <thead><tr style="background:var(--panel)">
@@ -4287,6 +4328,8 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
               </tr>`;
             }).join('')}</tbody>
           </table>`;
+
+      } else if (tab === 'confluence') {
         const confSearchUrl = `https://enthus.atlassian.net/wiki/search?text=BRRS`;
         const confPageUrl   = `https://enthus.atlassian.net/wiki/spaces/KD/pages/208863259`;
         content.innerHTML = `
