@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v1.8</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.0</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -1386,6 +1386,54 @@
             🚨 Priorität 1
           </button>
         </div>
+
+        <!-- Kundenprofil-Buttons -->
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="font-size:.68rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">🏢 Kundenprofile</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button id="brrs-profile-btn"
+              style="padding:5px 12px;border-radius:6px;border:1px solid rgba(45,212,191,.35);background:rgba(45,212,191,.08);color:#2dd4bf;font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);transition:all .15s">
+              ⚖️ BRRS Rechtsanwälte
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- BRRS Kundenprofil Panel -->
+      <div id="brrs-panel" style="display:none;margin-bottom:14px;background:var(--panel2);border:1px solid rgba(45,212,191,.2);border-radius:10px;padding:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:.88rem;font-weight:700;color:var(--text)">⚖️ BRRS Rechtsanwälte</div>
+          <div style="display:flex;gap:8px">
+            <a href="https://enthus.atlassian.net/wiki/spaces/KD/pages/208863259" target="_blank"
+              style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:.72rem;font-weight:600;text-decoration:none;transition:all .15s"
+              onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">
+              📘 Confluence
+            </a>
+            <a href="https://mts.enthus.de/dynamic/crm/customer?CustomerNo=973242" target="_blank"
+              style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:.72rem;font-weight:600;text-decoration:none;transition:all .15s"
+              onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">
+              🔗 MTS
+            </a>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div style="display:flex;gap:0;margin-bottom:12px;border-bottom:1px solid var(--border)">
+          <button class="brrs-tab-btn active" data-tab="tickets"
+            style="padding:6px 14px;border:none;background:none;color:var(--accent);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);border-bottom:2px solid var(--accent);margin-bottom:-1px">
+            🎫 Tickets
+          </button>
+          <button class="brrs-tab-btn" data-tab="kontakte"
+            style="padding:6px 14px;border:none;background:none;color:var(--dim);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);border-bottom:2px solid transparent;margin-bottom:-1px">
+            👤 Ansprechpartner
+          </button>
+          <button class="brrs-tab-btn" data-tab="konten"
+            style="padding:6px 14px;border:none;background:none;color:var(--dim);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);border-bottom:2px solid transparent;margin-bottom:-1px">
+            💳 Abrechnungskonten
+          </button>
+        </div>
+
+        <div id="brrs-tab-content" style="font-size:.78rem;color:var(--muted)">Lädt…</div>
       </div>
 
       <div style="height:1px;background:var(--border);margin-bottom:14px"></div>
@@ -1553,7 +1601,7 @@
   const KEY_JIRA_USER    = 'ta_jiraUser';
   const JIRA_CLIENT_ID   = 'ebfyOvhQso8SieLHc5ymMnsKkAD4sp1G';
   // ⚠️ NUR FÜR TESTS – VOR PRODUKTIVBETRIEB ENTFERNEN UND DURCH BACKEND ERSETZEN
-  const JIRA_CLIENT_SECRET = 'ATOAY2iBBxmOh7GMQOPfpd_c2EPT5owuCOQhGttI2XYLAcbWC5gT3lkm99psON0JWbd_6C837327';
+  const JIRA_CLIENT_SECRET = 'ATOA80pPmEgXOVlnIbB0b2Oc4lmQveaOcvmE2yXVG_FVyWCaSXjDE9AQ8Pf37LVQbvP66D2BBE29';
   const JIRA_CALLBACK    = 'https://jluenthus.github.io/Ticketassistent/';
   const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me read:jira-user read:cmdb-object:jira read:servicedesk-request read:servicedesk.organization:jira-service-management read:servicedesk.customer:jira-service-management';
   const KEY_NAME   = 'ta_eigenerName';
@@ -3643,8 +3691,8 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     try {
       // Firma-Suche: kein Preload nötig – Freitext-JQL bei Eingabe
       _allesFirmen = [];
-      document.getElementById('alles-status').textContent = 'Firmenname eintippen zum Suchen (mind. 2 Zeichen)';
-    // Pre-warm reporter cache
+      document.getElementById('alles-status').textContent = 'Lade Kontakte und Firmen…';
+    // Pre-warm all caches
     window._jiraReporters = null;
     window._apCache = null;
     window._firmaCache = null;
@@ -3652,30 +3700,14 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     const token2 = localStorage.getItem(KEY_JIRA_TOKEN);
     const cloud2 = localStorage.getItem(KEY_JIRA_CLOUD);
     if (token2 && cloud2) {
-      // Pre-warm reporters
-      fetch(`https://api.atlassian.com/ex/jira/${cloud2}/rest/api/3/search/jql`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token2}`, Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jql: 'project = ESD ORDER BY created DESC', maxResults: 100, fields: ['reporter'] })
-      }).then(r => r.json()).then(d => {
-        const seen = new Map();
-        (d.issues || []).forEach(i => {
-          const rep = i.fields?.reporter;
-          if (rep?.accountId && rep?.displayName) {
-            seen.set(rep.accountId, {
-              accountId: rep.accountId,
-              displayName: rep.displayName,
-              emailAddress: rep.emailAddress || '',
-              avatar: rep.avatarUrls?.['24x24'] || ''
-            });
-          }
-        });
-        window._jiraReporters = Array.from(seen.values());
+      // Pre-warm Assets caches in background
+      Promise.all([
+        searchAssets('objectType = "Ansprechpartner (Kunde)"', 1500).then(r => { window._apCache = r; }).catch(()=>{}),
+        searchAssets('objectType = "Firma (Kunde)"', 6000).then(r => { window._firmaCache = r; }).catch(()=>{})
+      ]).then(() => {
         document.getElementById('alles-status').textContent =
-          `Bereit · ${window._jiraReporters.length} Ansprechpartner geladen`;
-      }).catch(e => {
-        document.getElementById('alles-status').textContent = '⚠️ Reporter-Cache: ' + e.message;
-      });
+          `Bereit · ${window._apCache?.length || 0} Kontakte · ${window._firmaCache?.length || 0} Firmen geladen`;
+      }).catch(() => {});
     }
     } catch(e) {
       document.getElementById('alles-status').textContent = '❌ Fehler: ' + e.message;
@@ -3693,7 +3725,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       try {
         // Load and cache all Firma objects once, filter client-side
         if (!window._firmaCache) {
-          window._firmaCache = await searchAssets('objectType = "Firma (Kunde)"', 500);
+          window._firmaCache = await searchAssets('objectType = "Firma (Kunde)"', 6000);
         }
         const qLow = q.toLowerCase();
         const isKey = q.toUpperCase().startsWith('KUN');
@@ -3759,7 +3791,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           if (!window._apCache) {
             sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">⏳ Lade Kontakte…</div>`;
             sug.style.display = '';
-            window._apCache = await searchAssets('objectType = "Ansprechpartner (Kunde)"', 500);
+            window._apCache = await searchAssets('objectType = "Ansprechpartner (Kunde)"', 1500);
           }
           const qLow = q.toLowerCase();
           const objects = (window._apCache || []).filter(o => {
@@ -3947,7 +3979,126 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     }
   }
 
-  // Quick filter buttons
+  // ── BRRS Kundenprofil ────────────────────────────────────
+  const BRRS_OBJECT_KEY = 'KUN-38869';
+  const BRRS_JQL = 'project = ESD AND "Customer[Object]" = "BRRS Rechtsanwälte" AND resolution is EMPTY ORDER BY created DESC';
+
+  let _brrsActiveTab = 'tickets';
+
+  document.getElementById('brrs-profile-btn').addEventListener('click', async () => {
+    const panel = document.getElementById('brrs-panel');
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    document.getElementById('brrs-tab-content').textContent = 'Lädt…';
+    // Reset tab styling
+    document.querySelectorAll('.brrs-tab-btn').forEach(b => {
+      b.style.color = 'var(--dim)'; b.style.borderBottomColor = 'transparent';
+    });
+    const activeBtn = document.querySelector('.brrs-tab-btn[data-tab="tickets"]');
+    activeBtn.style.color = 'var(--accent)'; activeBtn.style.borderBottomColor = 'var(--accent)';
+    _brrsActiveTab = 'tickets';
+    loadBrrsTab('tickets');
+  });
+
+  document.querySelectorAll('.brrs-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.brrs-tab-btn').forEach(b => {
+        b.style.color = 'var(--dim)'; b.style.borderBottomColor = 'transparent';
+      });
+      btn.style.color = 'var(--accent)'; btn.style.borderBottomColor = 'var(--accent)';
+      _brrsActiveTab = btn.dataset.tab;
+      loadBrrsTab(btn.dataset.tab);
+    });
+  });
+
+  async function loadBrrsTab(tab) {
+    const token = localStorage.getItem(KEY_JIRA_TOKEN);
+    const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+    const content = document.getElementById('brrs-tab-content');
+    content.innerHTML = '<div style="color:var(--dim);font-size:.78rem">⏳ Lädt…</div>';
+
+    try {
+      if (tab === 'tickets') {
+        const r = await fetch(`https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jql: BRRS_JQL, maxResults: 25, fields: ['summary','status','priority','assignee','created'] })
+        });
+        const d = await r.json();
+        const issues = d.issues || [];
+        if (!issues.length) { content.innerHTML = '<div style="color:var(--dim)">Keine offenen Tickets</div>'; return; }
+        content.innerHTML = `
+          <div style="margin-bottom:6px;font-size:.7rem;color:var(--dim)">${d.total} offene Tickets, zeige ${issues.length}</div>
+          <table style="width:100%;border-collapse:collapse;font-size:.75rem">
+            <thead><tr style="background:var(--panel)">
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Ticket</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Zusammenfassung</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Status</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Prio</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Assignee</th>
+            </tr></thead>
+            <tbody>${issues.map(i => {
+              const f = i.fields;
+              const prioNum = (f.priority?.name||'').replace('Priorität ','');
+              const prioColor = {'1':'var(--red)','2':'var(--amber)','3':'#e8b339','4':'var(--accent)'}[prioNum]||'var(--dim)';
+              return `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:7px 10px;white-space:nowrap"><a href="https://enthus.atlassian.net/browse/${i.key}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:600">${i.key}</a></td>
+                <td style="padding:7px 10px;color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(f.summary||'').replace(/"/g,'')}">${f.summary||'–'}</td>
+                <td style="padding:7px 10px;white-space:nowrap"><span style="padding:2px 7px;border-radius:4px;background:var(--panel);color:var(--muted);font-size:.68rem">${f.status?.name||'–'}</span></td>
+                <td style="padding:7px 10px;color:${prioColor};font-weight:700;white-space:nowrap">${f.priority?.name||'–'}</td>
+                <td style="padding:7px 10px;color:var(--muted);white-space:nowrap">${f.assignee?.displayName||'–'}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>`;
+
+      } else if (tab === 'kontakte') {
+        // Load Ansprechpartner for BRRS from Assets cache or fresh
+        const allAp = window._apCache || await searchAssets('objectType = "Ansprechpartner (Kunde)"', 1500);
+        const brrs = allAp.filter(o => {
+          const firmaAttr = (o.attributes||[]).find(a => String(a.objectTypeAttributeId) === '40');
+          const firmaVal = firmaAttr?.objectAttributeValues?.[0]?.displayValue || '';
+          return firmaVal.toLowerCase().includes('brrs');
+        });
+        if (!brrs.length) { content.innerHTML = '<div style="color:var(--dim)">Keine Ansprechpartner gefunden</div>'; return; }
+        content.innerHTML = `
+          <div style="margin-bottom:8px;font-size:.7rem;color:var(--dim)">${brrs.length} Ansprechpartner</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${brrs.map(o => {
+              const email  = getAttr(o, 45);
+              const tel    = getAttr(o, 122);
+              const anzeige = getAttr(o, 31) || o.label || '';
+              return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px">
+                <div style="width:28px;height:28px;border-radius:50%;background:var(--accent-bg);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--accent);font-weight:700;flex-shrink:0">${(anzeige||'?').charAt(0).toUpperCase()}</div>
+                <div style="flex:1">
+                  <div style="font-size:.82rem;color:var(--text);font-weight:600">${anzeige}</div>
+                  <div style="font-size:.7rem;color:var(--dim)">${email}${tel ? ' · '+tel : ''}</div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>`;
+
+      } else if (tab === 'konten') {
+        // Load Abrechnungskonten for BRRS from Assets
+        const konten = await searchAssets('objectType = "Abrechnungskonto" AND "Firma (Kunde)" = "BRRS Rechtsanwälte"', 50);
+        if (!konten.length) { content.innerHTML = '<div style="color:var(--dim)">Keine Abrechnungskonten gefunden</div>'; return; }
+        content.innerHTML = `
+          <div style="margin-bottom:8px;font-size:.7rem;color:var(--dim)">${konten.length} Abrechnungskonten</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${konten.map(o => {
+              const label = o.label || o.name || o.objectKey || '–';
+              return `<div style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:.8rem;color:var(--text)">
+                <span style="font-family:var(--font-mono);font-size:.7rem;color:var(--dim);margin-right:8px">${o.objectKey||''}</span>${label}
+              </div>`;
+            }).join('')}
+          </div>`;
+      }
+    } catch(e) {
+      content.innerHTML = `<div style="color:var(--red);font-size:.78rem">❌ ${e.message}</div>`;
+    }
+  }
+
+  // Reset BRRS panel on modal reset
+  const _origReset = document.getElementById('alles-reset-btn').onclick;
   document.getElementById('alles-quickfilter').addEventListener('click', async (e) => {
     const btn = e.target.closest('.alles-qf-btn');
     if (!btn) return;
@@ -3999,6 +4150,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     document.getElementById('alles-tickets-wrap').style.display = 'none';
     document.getElementById('alles-tickets-body').innerHTML = '';
     document.getElementById('alles-status').textContent = '';
+    document.getElementById('brrs-panel').style.display = 'none';
     document.querySelectorAll('.alles-qf-btn').forEach(b => b.style.outline = '');
     _allesSelectedOrg = null;
   });
