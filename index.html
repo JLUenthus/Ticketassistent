@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.0</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.1</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -1395,6 +1395,10 @@
               style="padding:5px 12px;border-radius:6px;border:1px solid rgba(45,212,191,.35);background:rgba(45,212,191,.08);color:#2dd4bf;font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);transition:all .15s">
               ⚖️ BRRS Rechtsanwälte
             </button>
+            <button id="dashboard-btn"
+              style="padding:5px 12px;border-radius:6px;border:1px solid rgba(124,140,248,.35);background:var(--accent-bg);color:var(--accent);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);transition:all .15s">
+              📊 Dashboard
+            </button>
           </div>
         </div>
       </div>
@@ -1434,6 +1438,40 @@
         </div>
 
         <div id="brrs-tab-content" style="font-size:.78rem;color:var(--muted)">Lädt…</div>
+      </div>
+
+      <!-- Dashboard Panel -->
+      <div id="dashboard-panel" style="display:none;margin-bottom:14px;background:var(--panel2);border:1px solid rgba(124,140,248,.2);border-radius:10px;padding:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:.88rem;font-weight:700;color:var(--text)">📊 CSC Helpdesk Dashboard</div>
+          <div style="display:flex;gap:6px">
+            <a href="https://enthus.atlassian.net/issues/?filter=13698" target="_blank"
+              style="font-size:.68rem;color:var(--dim);text-decoration:none;padding:3px 8px;border:1px solid var(--border);border-radius:5px"
+              onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--dim)'">🔗 F1</a>
+            <a href="https://enthus.atlassian.net/issues/?filter=11251" target="_blank"
+              style="font-size:.68rem;color:var(--dim);text-decoration:none;padding:3px 8px;border:1px solid var(--border);border-radius:5px"
+              onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--dim)'">🔗 F2</a>
+            <a href="https://enthus.atlassian.net/issues/?filter=11261" target="_blank"
+              style="font-size:.68rem;color:var(--dim);text-decoration:none;padding:3px 8px;border:1px solid var(--border);border-radius:5px"
+              onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--dim)'">🔗 F3</a>
+          </div>
+        </div>
+        <!-- Tabs -->
+        <div style="display:flex;gap:0;margin-bottom:12px;border-bottom:1px solid var(--border)">
+          <button class="dash-tab-btn active" data-tab="neu"
+            style="padding:6px 14px;border:none;background:none;color:var(--accent);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);border-bottom:2px solid var(--accent);margin-bottom:-1px">
+            🆕 Neu &amp; Offen
+          </button>
+          <button class="dash-tab-btn" data-tab="wartend"
+            style="padding:6px 14px;border:none;background:none;color:var(--dim);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);border-bottom:2px solid transparent;margin-bottom:-1px">
+            ⏳ Wartend &amp; nicht zugewiesen
+          </button>
+          <button class="dash-tab-btn" data-tab="monitoring"
+            style="padding:6px 14px;border:none;background:none;color:var(--dim);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);border-bottom:2px solid transparent;margin-bottom:-1px">
+            📡 Monitoring
+          </button>
+        </div>
+        <div id="dashboard-tab-content" style="font-size:.78rem;color:var(--muted)">Lädt…</div>
       </div>
 
       <div style="height:1px;background:var(--border);margin-bottom:14px"></div>
@@ -3979,6 +4017,83 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     }
   }
 
+  // ── Dashboard ─────────────────────────────────────────────
+  const DASH_JQLS = {
+    neu: `project = ESD AND status IN (Neu) AND "Tempo Team.name" = Helpdesk AND summary !~ Monitoring AND "request type" != "Abrechnungskonto Unterstützung (ESD)" AND "Request Type" != "Monitoring Incident (ESD)" AND (labels = EMPTY OR labels != REOPENED)`,
+    wartend: `project = "enthus Service Desk" AND issuetype IN standardIssueTypes() AND status NOT IN (Neu, Abgebrochen, Erledigt) AND summary !~ Monitoring AND "Tempo Team.name" in ("enthus.blue Operational Services", EMPTY) AND assignee = empty AND "request type" != "Abrechnungskonto Unterstützung (ESD)" AND "Request Type" != "Monitoring Incident (ESD)" ORDER BY assignee ASC`,
+    monitoring: `project = ESD AND "Tempo Team.name" = "enthus.blue Operational Services" AND (summary ~ Monitoring OR "Request Type" = "Monitoring Incident (ESD)") AND statusCategory != Done ORDER BY status ASC`
+  };
+
+  let _dashActiveTab = 'neu';
+
+  document.getElementById('dashboard-btn').addEventListener('click', async () => {
+    const panel = document.getElementById('dashboard-panel');
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    // Reset tabs
+    document.querySelectorAll('.dash-tab-btn').forEach(b => {
+      b.style.color = 'var(--dim)'; b.style.borderBottomColor = 'transparent';
+    });
+    const first = document.querySelector('.dash-tab-btn[data-tab="neu"]');
+    first.style.color = 'var(--accent)'; first.style.borderBottomColor = 'var(--accent)';
+    _dashActiveTab = 'neu';
+    loadDashTab('neu');
+  });
+
+  document.querySelectorAll('.dash-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.dash-tab-btn').forEach(b => {
+        b.style.color = 'var(--dim)'; b.style.borderBottomColor = 'transparent';
+      });
+      btn.style.color = 'var(--accent)'; btn.style.borderBottomColor = 'var(--accent)';
+      _dashActiveTab = btn.dataset.tab;
+      loadDashTab(btn.dataset.tab);
+    });
+  });
+
+  async function loadDashTab(tab) {
+    const token = localStorage.getItem(KEY_JIRA_TOKEN);
+    const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+    const content = document.getElementById('dashboard-tab-content');
+    content.innerHTML = '<div style="color:var(--dim);font-size:.78rem">⏳ Lädt…</div>';
+    try {
+      const r = await fetch(`https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jql: DASH_JQLS[tab], maxResults: 25, fields: ['summary','status','priority','assignee','created','reporter'] })
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.errorMessages?.join(', ') || `HTTP ${r.status}`);
+      const issues = d.issues || [];
+      if (!issues.length) { content.innerHTML = '<div style="color:var(--green);font-size:.82rem">✅ Keine Tickets in dieser Ansicht</div>'; return; }
+      content.innerHTML = `
+        <div style="margin-bottom:6px;font-size:.7rem;color:var(--dim)">${d.total} Tickets, zeige ${issues.length}</div>
+        <table style="width:100%;border-collapse:collapse;font-size:.75rem">
+          <thead><tr style="background:var(--panel)">
+            <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Ticket</th>
+            <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Zusammenfassung</th>
+            <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Status</th>
+            <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Prio</th>
+            <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Assignee</th>
+          </tr></thead>
+          <tbody>${issues.map(i => {
+            const f = i.fields;
+            const prioNum = (f.priority?.name||'').replace('Priorität ','');
+            const prioColor = {'1':'var(--red)','2':'var(--amber)','3':'#e8b339','4':'var(--accent)'}[prioNum]||'var(--dim)';
+            return `<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:7px 10px;white-space:nowrap"><a href="https://enthus.atlassian.net/browse/${i.key}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:600">${i.key}</a></td>
+              <td style="padding:7px 10px;color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(f.summary||'').replace(/"/g,'')}">${f.summary||'–'}</td>
+              <td style="padding:7px 10px;white-space:nowrap"><span style="padding:2px 7px;border-radius:4px;background:var(--panel);color:var(--muted);font-size:.68rem">${f.status?.name||'–'}</span></td>
+              <td style="padding:7px 10px;color:${prioColor};font-weight:700;white-space:nowrap">${f.priority?.name||'–'}</td>
+              <td style="padding:7px 10px;color:var(--muted);white-space:nowrap">${f.assignee?.displayName||'–'}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>`;
+    } catch(e) {
+      content.innerHTML = `<div style="color:var(--red);font-size:.78rem">❌ ${e.message}</div>`;
+    }
+  }
+
   // ── BRRS Kundenprofil ────────────────────────────────────
   const BRRS_OBJECT_KEY = 'KUN-38869';
   const BRRS_JQL = 'project = ESD AND "Customer[Object]" = "BRRS Rechtsanwälte" AND resolution is EMPTY ORDER BY created DESC';
@@ -4151,6 +4266,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     document.getElementById('alles-tickets-body').innerHTML = '';
     document.getElementById('alles-status').textContent = '';
     document.getElementById('brrs-panel').style.display = 'none';
+    document.getElementById('dashboard-panel').style.display = 'none';
     document.querySelectorAll('.alles-qf-btn').forEach(b => b.style.outline = '');
     _allesSelectedOrg = null;
   });
