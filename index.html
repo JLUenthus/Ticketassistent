@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v3.4</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v3.5</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -1434,6 +1434,10 @@
           <button class="brrs-tab-btn" data-tab="konten"
             style="padding:6px 14px;border:none;background:none;color:var(--dim);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);border-bottom:2px solid transparent;margin-bottom:-1px">
             💳 Abrechnungskonten
+          </button>
+          <button class="brrs-tab-btn" data-tab="confluence"
+            style="padding:6px 14px;border:none;background:none;color:var(--dim);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);border-bottom:2px solid transparent;margin-bottom:-1px">
+            📘 Confluence
           </button>
         </div>
 
@@ -1645,7 +1649,7 @@
   // ⚠️ NUR FÜR TESTS – VOR PRODUKTIVBETRIEB ENTFERNEN UND DURCH BACKEND ERSETZEN
   const JIRA_CLIENT_SECRET = 'ATOA80pPmEgXOVlnIbB0b2Oc4lmQveaOcvmE2yXVG_FVyWCaSXjDE9AQ8Pf37LVQbvP66D2BBE29';
   const JIRA_CALLBACK    = 'https://jluenthus.github.io/Ticketassistent/';
-  const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me read:jira-user read:cmdb-object:jira read:servicedesk-request read:servicedesk.organization:jira-service-management read:servicedesk.customer:jira-service-management';
+  const JIRA_SCOPES      = 'read:jira-work write:jira-work read:me read:jira-user read:cmdb-object:jira read:servicedesk-request read:servicedesk.organization:jira-service-management read:servicedesk.customer:jira-service-management read:confluence-content.all read:confluence-space.summary read:confluence-user';
   const KEY_NAME   = 'ta_eigenerName';
   const KEY_SESS   = 'ta_sessions';
   const KEY_ACTIVE = 'ta_activeTab';
@@ -4209,13 +4213,39 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
               </div>`;
             }).join('')}
           </div>`;
+      } else if (tab === 'confluence') {
+        // Search Confluence for BRRS pages
+        const confResp = await fetch(
+          `https://api.atlassian.com/ex/confluence/${cloud}/wiki/rest/api/content/search?cql=text~"BRRS" AND type=page ORDER BY lastmodified DESC&limit=15&expand=history.lastUpdated,space`,
+          { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+        );
+        const confData = await confResp.json();
+        if (!confResp.ok) throw new Error(confData.message || `HTTP ${confResp.status}`);
+        const pages = confData.results || [];
+        if (!pages.length) { content.innerHTML = '<div style="color:var(--dim)">Keine Confluence-Seiten gefunden</div>'; return; }
+        content.innerHTML = `
+          <div style="margin-bottom:8px;font-size:.7rem;color:var(--dim)">${confData.totalSize || pages.length} Seiten gefunden</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${pages.map(p => {
+              const updated = p.history?.lastUpdated?.when ? new Date(p.history.lastUpdated.when).toLocaleDateString('de-DE') : '';
+              const space   = p.space?.name || '';
+              const url     = `https://enthus.atlassian.net/wiki${p._links?.webui || ''}`;
+              return `<div style="padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;display:flex;align-items:flex-start;gap:10px">
+                <span style="font-size:.9rem;flex-shrink:0">📄</span>
+                <div style="flex:1;min-width:0">
+                  <a href="${url}" target="_blank" style="font-size:.82rem;color:var(--accent);font-weight:600;text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.title}</a>
+                  <div style="font-size:.7rem;color:var(--dim);margin-top:2px">${space}${updated ? ' · ' + updated : ''}</div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>`;
+
       }
     } catch(e) {
       content.innerHTML = `<div style="color:var(--red);font-size:.78rem">❌ ${e.message}</div>`;
     }
   }
 
-  // Reset BRRS panel on modal reset
   document.getElementById('alles-quickfilter').addEventListener('click', async (e) => {
     const btn = e.target.closest('.alles-qf-btn');
     if (!btn) return;
