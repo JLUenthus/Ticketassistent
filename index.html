@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v3.2</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v3.4</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3744,41 +3744,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     const token2 = localStorage.getItem(KEY_JIRA_TOKEN);
     const cloud2 = localStorage.getItem(KEY_JIRA_CLOUD);
     if (token2 && cloud2) {
-      const wsId2 = await getWorkspaceId();
-      document.getElementById('alles-status').textContent = '⏳ Lade Kontakte & Firmen im Hintergrund…';
-
-      const loadAllPages = async (qlQuery, cacheObj, totalHint, label) => {
-        const pageSize = 25;
-        const totalPages = Math.ceil(totalHint / pageSize);
-        const batchSize = 10;
-        for (let b = 0; b < Math.ceil(totalPages / batchSize); b++) {
-          const batch = [];
-          for (let i = 0; i < batchSize; i++) {
-            const page = b * batchSize + i;
-            if (page >= totalPages) break;
-            const startAt = page * pageSize;
-            const key = `p_${startAt}`;
-            if (cacheObj[key]) continue;
-            batch.push(
-              fetch(`https://api.atlassian.com/ex/jira/${cloud2}/jsm/assets/workspace/${wsId2}/v1/object/aql`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token2}`, Accept: 'application/json', 'Content-Type': 'application/json' },
-                body: JSON.stringify({ qlQuery, startAt, maxResults: pageSize, includeAttributes: true })
-              }).then(r => r.json()).then(d => { cacheObj[key] = d.values || []; }).catch(()=>{})
-            );
-          }
-          await Promise.all(batch);
-        }
-      };
-
-      Promise.all([
-        loadAllPages('objectType = "Ansprechpartner (Kunde)" ORDER BY Name ASC', window._apPageCache, 14989, 'Kontakte'),
-        loadAllPages('objectType = "Firma (Kunde)" ORDER BY Name ASC', window._firmaPageCache, 5333, 'Firmen')
-      ]).then(() => {
-        const apCount  = Object.values(window._apPageCache).flat().length;
-        const firCount = Object.values(window._firmaPageCache).flat().length;
-        document.getElementById('alles-status').textContent = `✅ ${apCount} Kontakte · ${firCount} Firmen geladen`;
-      }).catch(() => {});
+      document.getElementById('alles-status').textContent = 'Bereit – tippe zum Suchen';
     }
     } catch(e) {
       document.getElementById('alles-status').textContent = '❌ Fehler: ' + e.message;
@@ -3796,31 +3762,19 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       try {
         const token = localStorage.getItem(KEY_JIRA_TOKEN);
         const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
-        const wsId = await getWorkspaceId();
-        const qLow = q.toLowerCase();
-        const isKey = q.toUpperCase().startsWith('KUN');
-
-        // Filter from preloaded firma page cache
-        const cache = window._firmaPageCache || {};
-        const found = [];
-        for (const pageData of Object.values(cache)) {
-          for (const o of pageData) {
-            const label = (o.label || '').toLowerCase();
-            const key   = (o.objectKey || '').toLowerCase();
-            if (isKey ? key.includes(qLow) : label.includes(qLow)) found.push(o);
-            if (found.length >= 8) break;
-          }
-          if (found.length >= 8) break;
-        }
-
+        const wsId  = await getWorkspaceId();
+        const qLow  = q.toLowerCase();
+        // Get the 25 available firms from cache and filter
+        const cached = Object.values(window._firmaPageCache || {})[0] || [];
+        const found  = cached.filter(o => (o.label||'').toLowerCase().includes(qLow)).slice(0, 8);
         sug.innerHTML = '';
         if (!found.length) {
-          sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Keine Ergebnisse – Cache noch laden? ${Object.keys(cache).length} Seiten geladen</div>`;
+          sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Nicht in Schnellauswahl – tippe KUN-XXXXX für direktes Lookup</div>`;
           sug.style.display = '';
           return;
         }
-        sug.innerHTML = found.slice(0, 8).map(o => {
-          const name = o.label || o.name || o.id;
+        sug.innerHTML = found.map(o => {
+          const name = o.label || o.id;
           return `<div class="alles-sug-item" data-id="${o.id}" data-name="${String(name).replace(/"/g,'&quot;')}"
             style="display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;color:var(--text);font-size:.82rem;border-bottom:1px solid var(--border);transition:background .1s"
             onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background=''">
@@ -3861,10 +3815,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
       if (!token || !cloud) return;
       try {
-        // Search Ansprechpartner – load all and filter client-side (Assets AQL has no text search)
         try {
-          const token = localStorage.getItem(KEY_JIRA_TOKEN);
-          const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
           const wsId = await getWorkspaceId();
           if (!wsId) {
             sug.innerHTML = `<div style="padding:9px 14px;color:var(--red);font-size:.78rem">❌ Workspace ID nicht verfügbar</div>`;
@@ -3873,19 +3824,16 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           }
           sug.innerHTML = '<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">⏳ Suche…</div>';
           sug.style.display = '';
-
           const qLow = q.toLowerCase();
-          // Filter from preloaded page cache
-          const found = [];
-          const cache = window._apPageCache || {};
-          for (const pageData of Object.values(cache)) {
-            for (const o of pageData) {
-              if ((o.label||'').toLowerCase().includes(qLow)) found.push(o);
-              if (found.length >= 8) break;
+          const r = await fetch(
+            `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/object/aql`,
+            { method: 'POST',
+              headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+              body: JSON.stringify({ qlQuery: 'objectType = "Ansprechpartner (Kunde)"', startAt: 0, maxResults: 25, includeAttributes: true })
             }
-            if (found.length >= 8) break;
-          }
-          const objects = found.slice(0, 8);
+          );
+          const d = await r.json();
+          const objects = (d.values || []).filter(o => (o.label||'').toLowerCase().includes(qLow)).slice(0, 8);
           if (!objects.length) {
             sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Keine Ergebnisse für: ${q}</div>`;
             return;
