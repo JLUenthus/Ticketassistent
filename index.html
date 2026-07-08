@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.2</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.3</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3741,13 +3741,14 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     const cloud2 = localStorage.getItem(KEY_JIRA_CLOUD);
     if (token2 && cloud2) {
       // Pre-warm Assets caches in background
+      const statusEl = document.getElementById('alles-status');
+      statusEl.textContent = '⏳ Lade Kontakte und Firmen im Hintergrund…';
       Promise.all([
-        searchAssets('objectType = "Ansprechpartner (Kunde)"', 1500).then(r => { window._apCache = r; }).catch(()=>{}),
-        searchAssets('objectType = "Firma (Kunde)"', 6000).then(r => { window._firmaCache = r; }).catch(()=>{})
+        searchAssets('objectType = "Ansprechpartner (Kunde)"', 1500).then(r => { window._apCache = r; }).catch(()=>{ window._apCache = []; }),
+        searchAssets('objectType = "Firma (Kunde)"', 6000).then(r => { window._firmaCache = r; }).catch(()=>{ window._firmaCache = []; })
       ]).then(() => {
-        document.getElementById('alles-status').textContent =
-          `Bereit · ${window._apCache?.length || 0} Kontakte · ${window._firmaCache?.length || 0} Firmen geladen`;
-      }).catch(() => {});
+        statusEl.textContent = `✅ Bereit · ${window._apCache?.length || 0} Kontakte · ${window._firmaCache?.length || 0} Firmen geladen`;
+      }).catch(() => { statusEl.textContent = '⚠️ Cache-Fehler'; });
     }
     } catch(e) {
       document.getElementById('alles-status').textContent = '❌ Fehler: ' + e.message;
@@ -3767,11 +3768,16 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         if (!window._firmaCache) {
           window._firmaCache = await searchAssets('objectType = "Firma (Kunde)"', 6000);
         }
+        if (!window._firmaCache || window._firmaCache.length === 0) {
+          sug.innerHTML = '<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">⏳ Firmen werden noch geladen…</div>';
+          sug.style.display = '';
+          return;
+        }
         const qLow = q.toLowerCase();
         const isKey = q.toUpperCase().startsWith('KUN');
         const objects = (window._firmaCache || []).filter(o => {
-          const label = (o.label || o.name || '').toLowerCase();
-          const key   = (o.objectKey || '').toLowerCase();
+          const label    = (o.label || o.name || '').toLowerCase();
+          const key      = (o.objectKey || '').toLowerCase();
           const nameAttr = getAttr(o, 18).toLowerCase();
           return isKey ? key.includes(qLow) : label.includes(qLow) || nameAttr.includes(qLow);
         }).slice(0, 8);
@@ -3833,6 +3839,11 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
             sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">⏳ Lade Kontakte…</div>`;
             sug.style.display = '';
             window._apCache = await searchAssets('objectType = "Ansprechpartner (Kunde)"', 1500);
+          }
+          if (!window._apCache || window._apCache.length === 0) {
+            sug.innerHTML = '<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">⏳ Kontakte werden noch geladen…</div>';
+            sug.style.display = '';
+            return;
           }
           const qLow = q.toLowerCase();
           const objects = (window._apCache || []).filter(o => {
@@ -4195,7 +4206,16 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
 
       } else if (tab === 'konten') {
         // Load Abrechnungskonten for BRRS from Assets
-        const konten = await searchAssets('objectType = "Abrechnungskonto"', 200);
+        // Load Abrechnungskonten and filter for BRRS (objectKey KUN-38869, objectId needed)
+        const allKonten = await searchAssets('objectType = "Abrechnungskonto"', 200);
+        // Filter: Firma attribute (find attribute referencing BRRS)
+        const konten = allKonten.filter(o => {
+          return (o.attributes||[]).some(a => {
+            const val = a.objectAttributeValues?.[0];
+            return val?.referencedObject?.objectKey === 'KUN-38869' ||
+                   (val?.displayValue||'').toLowerCase().includes('brrs');
+          });
+        });
         if (!konten.length) { content.innerHTML = '<div style="color:var(--dim)">Keine Abrechnungskonten gefunden</div>'; return; }
         content.innerHTML = `
           <div style="margin-bottom:8px;font-size:.7rem;color:var(--dim)">${konten.length} Abrechnungskonten</div>
