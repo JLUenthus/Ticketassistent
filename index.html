@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.5</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.6</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3759,23 +3759,18 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     clearTimeout(_firmaSearchTimer);
     _firmaSearchTimer = setTimeout(async () => {
       try {
-        // Load and cache all Firma objects once, filter client-side
-        if (!window._firmaCache) {
-          window._firmaCache = await searchAssets('objectType = "Firma (Kunde)"', 6000);
-        }
-        if (!window._firmaCache || window._firmaCache.length === 0) {
-          sug.innerHTML = '<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">⏳ Firmen werden noch geladen…</div>';
-          sug.style.display = '';
-          return;
-        }
-        const qLow = q.toLowerCase();
-        const isKey = q.toUpperCase().startsWith('KUN');
-        const objects = (window._firmaCache || []).filter(o => {
-          const label    = (o.label || o.name || '').toLowerCase();
-          const key      = (o.objectKey || '').toLowerCase();
-          const nameAttr = getAttr(o, 18).toLowerCase();
-          return isKey ? key.includes(qLow) : label.includes(qLow) || nameAttr.includes(qLow);
-        }).slice(0, 8);
+        const token = localStorage.getItem(KEY_JIRA_TOKEN);
+        const cloud = localStorage.getItem(KEY_JIRA_CLOUD);
+        const wsId = await getWorkspaceId();
+        sug.innerHTML = '<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">⏳ Suche…</div>';
+        sug.style.display = '';
+        const params = new URLSearchParams({ objectTypeId: 3, query: q, maxResults: 8 });
+        const r = await fetch(
+          `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/object/search?${params}`,
+          { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+        );
+        const d = await r.json();
+        const objects = d.values || [];
         // Remove debug div
         sug.innerHTML = '';
         if (!objects.length) { sug.style.display = 'none'; return; }
@@ -4230,7 +4225,6 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
   }
 
   // Reset BRRS panel on modal reset
-  const _origReset = document.getElementById('alles-reset-btn').onclick;
   document.getElementById('alles-quickfilter').addEventListener('click', async (e) => {
     const btn = e.target.closest('.alles-qf-btn');
     if (!btn) return;
@@ -4261,11 +4255,10 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       const d = await r.json();
       if (!r.ok) throw new Error(d.errorMessages?.join(', ') || `HTTP ${r.status}`);
       renderTicketRows(d.issues || [], d.total);
-      document.getElementById('alles-tickets-count').textContent = `${d.total} Tickets, zeige ${Math.min(d.total, 25)}`;
+      const total = d.total ?? d.issues?.length ?? 0;
+      document.getElementById('alles-tickets-count').textContent = `${total} Tickets, zeige ${Math.min(total, 25)}`;
       document.getElementById('alles-status').textContent = '';
       document.getElementById('alles-tickets-wrap').style.display = '';
-      // Update table header label
-      document.querySelector('#alles-tickets-wrap div:first-child').textContent = label;
     } catch(e) {
       document.getElementById('alles-status').textContent = '❌ ' + e.message;
     }
@@ -4281,7 +4274,8 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     if (detailEl) detailEl.innerHTML = '';
     document.getElementById('alles-tickets-wrap').style.display = 'none';
     document.getElementById('alles-tickets-body').innerHTML = '';
-    document.getElementById('alles-status').textContent = '';
+    document.getElementById('alles-tickets-count').textContent = '';
+    document.getElementById('alles-status').textContent = 'Firma oder Ansprechpartner eingeben zum Suchen (mind. 2 Zeichen)';
     document.getElementById('brrs-panel').style.display = 'none';
     document.getElementById('dashboard-panel').style.display = 'none';
     document.querySelectorAll('.alles-qf-btn').forEach(b => b.style.outline = '');
