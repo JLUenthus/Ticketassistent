@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.3</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.4</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -1483,6 +1483,7 @@
           placeholder="Firmenname eingeben…"
           style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:var(--font-ui);font-size:.85rem;outline:none;transition:border-color .15s">
         <div id="alles-firma-suggestions"
+          onmousedown="event.preventDefault()"
           style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--panel);border:1px solid var(--border2);border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)">
         </div>
       </div>
@@ -1497,6 +1498,7 @@
           placeholder="Name oder E-Mail eingeben…"
           style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:var(--font-ui);font-size:.85rem;outline:none;transition:border-color .15s">
         <div id="alles-kontakt-suggestions"
+          onmousedown="event.preventDefault()"
           style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--panel);border:1px solid var(--border2);border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)">
         </div>
       </div>
@@ -3744,8 +3746,8 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       const statusEl = document.getElementById('alles-status');
       statusEl.textContent = '⏳ Lade Kontakte und Firmen im Hintergrund…';
       Promise.all([
-        searchAssets('objectType = "Ansprechpartner (Kunde)"', 1500).then(r => { window._apCache = r; }).catch(()=>{ window._apCache = []; }),
-        searchAssets('objectType = "Firma (Kunde)"', 6000).then(r => { window._firmaCache = r; }).catch(()=>{ window._firmaCache = []; })
+        searchAssets('objectType = "Ansprechpartner (Kunde)"', 1500).then(r => { const seen = new Set(); window._apCache = r.filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true; }); }).catch(()=>{ window._apCache = []; }),
+        searchAssets('objectType = "Firma (Kunde)"', 6000).then(r => { const seen = new Set(); window._firmaCache = r.filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true; }); }).catch(()=>{ window._firmaCache = []; })
       ]).then(() => {
         statusEl.textContent = `✅ Bereit · ${window._apCache?.length || 0} Kontakte · ${window._firmaCache?.length || 0} Firmen geladen`;
       }).catch(() => { statusEl.textContent = '⚠️ Cache-Fehler'; });
@@ -4207,13 +4209,15 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
       } else if (tab === 'konten') {
         // Load Abrechnungskonten for BRRS from Assets
         // Load Abrechnungskonten and filter for BRRS (objectKey KUN-38869, objectId needed)
-        const allKonten = await searchAssets('objectType = "Abrechnungskonto"', 200);
-        // Filter: Firma attribute (find attribute referencing BRRS)
+        // Use objectId 38869 for BRRS Rechtsanwälte
+        const allKonten = await searchAssets('objectType = "Abrechnungskonto"', 500);
         const konten = allKonten.filter(o => {
           return (o.attributes||[]).some(a => {
             const val = a.objectAttributeValues?.[0];
-            return val?.referencedObject?.objectKey === 'KUN-38869' ||
-                   (val?.displayValue||'').toLowerCase().includes('brrs');
+            const refId  = val?.referencedObject?.id || val?.referencedObject?.objectId || '';
+            const refKey = val?.referencedObject?.objectKey || '';
+            const dispVal = (val?.displayValue || '').toLowerCase();
+            return refId === '38869' || refKey === 'KUN-38869' || dispVal.includes('brrs');
           });
         });
         if (!konten.length) { content.innerHTML = '<div style="color:var(--dim)">Keine Abrechnungskonten gefunden</div>'; return; }
@@ -4295,6 +4299,12 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
   document.getElementById('alles-test-close').addEventListener('click', () => closeModal('alles-test-modal'));
   document.getElementById('alles-test-modal').addEventListener('click', e => {
     if (e.target.id === 'alles-test-modal') closeModal('alles-test-modal');
+  });
+  document.getElementById('alles-firma-input').addEventListener('blur', () => {
+    setTimeout(() => { document.getElementById('alles-firma-suggestions').style.display = 'none'; }, 150);
+  });
+  document.getElementById('alles-kontakt-input').addEventListener('blur', () => {
+    setTimeout(() => { document.getElementById('alles-kontakt-suggestions').style.display = 'none'; }, 150);
   });
   document.getElementById('alles-firma-input').addEventListener('keydown', e => {
     if (e.key === 'Escape') document.getElementById('alles-firma-suggestions').style.display = 'none';
