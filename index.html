@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v3.7</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v4.0</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -1438,6 +1438,14 @@
           <button class="brrs-tab-btn" data-tab="confluence"
             style="padding:6px 14px;border:none;background:none;color:var(--dim);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);border-bottom:2px solid transparent;margin-bottom:-1px">
             📘 Confluence
+          </button>
+          <button class="brrs-tab-btn" data-tab="sla"
+            style="padding:6px 14px;border:none;background:none;color:var(--red);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);border-bottom:2px solid transparent;margin-bottom:-1px">
+            ⏰ SLA abgelaufen
+          </button>
+          <button class="brrs-tab-btn" data-tab="closed"
+            style="padding:6px 14px;border:none;background:none;color:var(--dim);font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--font-ui);border-bottom:2px solid transparent;margin-bottom:-1px">
+            ✅ Geschlossen
           </button>
         </div>
 
@@ -4198,48 +4206,104 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           <div style="display:flex;flex-direction:column;gap:6px">
             ${konten.map(o => {
               const label = o.label || o.name || o.objectKey || '–';
-              return `<div style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:.8rem;color:var(--text)">
-                <span style="font-family:var(--font-mono);font-size:.7rem;color:var(--dim);margin-right:8px">${o.objectKey||''}</span>${label}
-              </div>`;
+              const assetUrl = `https://enthus.atlassian.net/jira/assets/object/${o.id}`;
+              return `<a href="${assetUrl}" target="_blank" style="text-decoration:none">
+                <div style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:.8rem;color:var(--text);display:flex;align-items:center;gap:8px;transition:border-color .15s"
+                  onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+                  <span style="font-family:var(--font-mono);font-size:.7rem;color:var(--dim);flex-shrink:0">${o.objectKey||''}</span>
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span>
+                  <span style="font-size:.7rem;color:var(--accent);flex-shrink:0">↗</span>
+                </div>
+              </a>`;
             }).join('')}
           </div>`;
-      } else if (tab === 'confluence') {
-        // Get Confluence cloud ID (may differ from Jira cloud ID)
-        let confCloudId = cloud;
-        try {
-          const resResp = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
-          });
-          const resources = await resResp.json();
-          const confResource = resources.find(r => r.scopes?.some(s => s.includes('confluence')) || r.url?.includes('atlassian.net'));
-          if (confResource) confCloudId = confResource.id;
-        } catch(e) {}
-
-        // Search Confluence for BRRS pages
-        const cql = encodeURIComponent('text ~ "BRRS" AND type = page ORDER BY lastmodified DESC');
-        const confResp = await fetch(
-          `https://api.atlassian.com/ex/confluence/${confCloudId}/wiki/rest/api/content/search?cql=${cql}&limit=15&expand=history.lastUpdated,space`,
-          { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
-        );
-        const confData = await confResp.json();
-        if (!confResp.ok) throw new Error(confData.message || `HTTP ${confResp.status}: ${JSON.stringify(confData).substring(0,100)}`);
-        const pages = confData.results || [];
-        if (!pages.length) { content.innerHTML = '<div style="color:var(--dim)">Keine Confluence-Seiten gefunden</div>'; return; }
+      } else if (tab === 'sla') {
+        const jql = 'project = ESD AND text ~ "BRRS" AND SLA < 0 AND resolution is EMPTY ORDER BY created DESC';
+        const r = await fetch(`https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jql, maxResults: 25, fields: ['summary','status','priority','assignee','created','customfield_10504'] })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.errorMessages?.join(', ') || `HTTP ${r.status}`);
+        const issues = d.issues || [];
+        if (!issues.length) { content.innerHTML = '<div style="color:var(--green);font-size:.82rem">✅ Keine abgelaufenen SLAs</div>'; return; }
         content.innerHTML = `
-          <div style="margin-bottom:8px;font-size:.7rem;color:var(--dim)">${confData.totalSize || pages.length} Seiten gefunden</div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            ${pages.map(p => {
-              const updated = p.history?.lastUpdated?.when ? new Date(p.history.lastUpdated.when).toLocaleDateString('de-DE') : '';
-              const space   = p.space?.name || '';
-              const url     = `https://enthus.atlassian.net/wiki${p._links?.webui || ''}`;
-              return `<div style="padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;display:flex;align-items:flex-start;gap:10px">
-                <span style="font-size:.9rem;flex-shrink:0">📄</span>
-                <div style="flex:1;min-width:0">
-                  <a href="${url}" target="_blank" style="font-size:.82rem;color:var(--accent);font-weight:600;text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.title}</a>
-                  <div style="font-size:.7rem;color:var(--dim);margin-top:2px">${space}${updated ? ' · ' + updated : ''}</div>
-                </div>
-              </div>`;
-            }).join('')}
+          <div style="margin-bottom:6px;font-size:.7rem;color:var(--red);font-weight:700">⚠️ ${d.total} Tickets mit abgelaufener Reaktionszeit</div>
+          <table style="width:100%;border-collapse:collapse;font-size:.75rem">
+            <thead><tr style="background:var(--panel)">
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Ticket</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Zusammenfassung</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Status</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Prio</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Assignee</th>
+            </tr></thead>
+            <tbody>${issues.map(i => {
+              const f = i.fields;
+              const prioNum = (f.priority?.name||'').replace('Priorität ','');
+              const prioColor = {'1':'var(--red)','2':'var(--amber)','3':'#e8b339','4':'var(--accent)'}[prioNum]||'var(--dim)';
+              return `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:7px 10px;white-space:nowrap"><a href="https://enthus.atlassian.net/browse/${i.key}" target="_blank" style="color:var(--red);text-decoration:none;font-weight:600">${i.key}</a></td>
+                <td style="padding:7px 10px;color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.summary||'–'}</td>
+                <td style="padding:7px 10px"><span style="padding:2px 7px;border-radius:4px;background:var(--panel);color:var(--muted);font-size:.68rem">${f.status?.name||'–'}</span></td>
+                <td style="padding:7px 10px;color:${prioColor};font-weight:700">${f.priority?.name||'–'}</td>
+                <td style="padding:7px 10px;color:var(--muted)">${f.assignee?.displayName||'–'}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>`;
+
+      } else if (tab === 'closed') {
+        const jql = 'project = ESD AND text ~ "BRRS" AND statusCategory = Done ORDER BY resolutiondate DESC';
+        const r = await fetch(`https://api.atlassian.com/ex/jira/${cloud}/rest/api/3/search/jql`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jql, maxResults: 25, fields: ['summary','status','priority','assignee','resolutiondate'] })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.errorMessages?.join(', ') || `HTTP ${r.status}`);
+        const issues = d.issues || [];
+        if (!issues.length) { content.innerHTML = '<div style="color:var(--dim)">Keine geschlossenen Tickets</div>'; return; }
+        content.innerHTML = `
+          <div style="margin-bottom:6px;font-size:.7rem;color:var(--dim)">${d.total} geschlossene Tickets, zeige ${issues.length}</div>
+          <table style="width:100%;border-collapse:collapse;font-size:.75rem">
+            <thead><tr style="background:var(--panel)">
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Ticket</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Zusammenfassung</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Status</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Prio</th>
+              <th style="padding:6px 10px;text-align:left;color:var(--dim);font-size:.65rem;text-transform:uppercase;border-bottom:1px solid var(--border)">Gelöst am</th>
+            </tr></thead>
+            <tbody>${issues.map(i => {
+              const f = i.fields;
+              const prioNum = (f.priority?.name||'').replace('Priorität ','');
+              const prioColor = {'1':'var(--red)','2':'var(--amber)','3':'#e8b339','4':'var(--accent)'}[prioNum]||'var(--dim)';
+              const resolved = f.resolutiondate ? new Date(f.resolutiondate).toLocaleDateString('de-DE') : '–';
+              return `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:7px 10px;white-space:nowrap"><a href="https://enthus.atlassian.net/browse/${i.key}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:600">${i.key}</a></td>
+                <td style="padding:7px 10px;color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.summary||'–'}</td>
+                <td style="padding:7px 10px"><span style="padding:2px 7px;border-radius:4px;background:rgba(74,222,128,.1);color:var(--green);font-size:.68rem">${f.status?.name||'–'}</span></td>
+                <td style="padding:7px 10px;color:${prioColor};font-weight:700">${f.priority?.name||'–'}</td>
+                <td style="padding:7px 10px;color:var(--muted);font-size:.72rem">${resolved}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>`;
+        const confSearchUrl = `https://enthus.atlassian.net/wiki/search?text=BRRS`;
+        const confPageUrl   = `https://enthus.atlassian.net/wiki/spaces/KD/pages/208863259`;
+        content.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="padding:12px 14px;background:var(--bg);border:1px solid rgba(124,140,248,.2);border-radius:8px">
+              <div style="font-size:.75rem;color:var(--dim);margin-bottom:8px">Die Confluence-API benötigt einen separaten Token-Kontext – direkter Link zur Confluence-Suche:</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <a href="${confPageUrl}" target="_blank"
+                  style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;border:1px solid rgba(124,140,248,.35);background:var(--accent-bg);color:var(--accent);font-size:.78rem;font-weight:700;text-decoration:none">
+                  📘 Kundendoku BRRS öffnen
+                </a>
+                <a href="${confSearchUrl}" target="_blank"
+                  style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.78rem;font-weight:600;text-decoration:none">
+                  🔍 Confluence nach BRRS suchen
+                </a>
+              </div>
+            </div>
           </div>`;
 
       }
