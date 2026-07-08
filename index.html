@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.7</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.9</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -3739,6 +3739,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
     window._apCache = null;
     window._firmaCache = null;
     window._apAttrNames = null;
+    window._apPageCache = {};
     const token2 = localStorage.getItem(KEY_JIRA_TOKEN);
     const cloud2 = localStorage.getItem(KEY_JIRA_CLOUD);
     if (token2 && cloud2) {
@@ -3765,9 +3766,17 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         sug.innerHTML = '<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">⏳ Suche…</div>';
         sug.style.display = '';
         const params = new URLSearchParams({ objectTypeId: 3, query: q, maxResults: 8 });
+        const isKey = q.toUpperCase().startsWith('KUN');
+        const qlQuery = isKey
+          ? `objectType = "Firma (Kunde)" AND objectKey = "${q}"`
+          : `objectType = "Firma (Kunde)" AND label like "${q}*"`;
         const r = await fetch(
-          `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/object/search?${params}`,
-          { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
+          `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/object/aql`,
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ qlQuery, startAt: 0, maxResults: 8, includeAttributes: true })
+          }
         );
         const d = await r.json();
         const objects = d.values || [];
@@ -3828,13 +3837,46 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           }
           sug.innerHTML = '<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">⏳ Suche…</div>';
           sug.style.display = '';
-          const params = new URLSearchParams({ objectTypeId: 4, query: q, maxResults: 8 });
-          const r = await fetch(
-            `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/object/search?${params}`,
-            { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
-          );
-          const d = await r.json();
-          const objects = d.values || [];
+
+          // Load multiple pages and filter client-side
+          // 14989 Ansprechpartner total, pages of 25
+          // Use cache per session to avoid reloading
+          if (!window._apPageCache) window._apPageCache = {};
+          const qLow = q.toLowerCase();
+          const found = [];
+          const pageSize = 25;
+          const maxPages = 40; // load up to 1000 objects max
+
+          // Check if we already have enough cached pages
+          let page = 0;
+          while (found.length < 8 && page < maxPages) {
+            const startAt = page * pageSize;
+            const cacheKey = `ap_${startAt}`;
+            let pageData;
+            if (window._apPageCache[cacheKey]) {
+              pageData = window._apPageCache[cacheKey];
+            } else {
+              const r = await fetch(
+                `https://api.atlassian.com/ex/jira/${cloud}/jsm/assets/workspace/${wsId}/v1/object/aql`,
+                {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ qlQuery: 'objectType = "Ansprechpartner (Kunde)"', startAt, maxResults: pageSize, includeAttributes: true })
+                }
+              );
+              const d = await r.json();
+              pageData = d.values || [];
+              window._apPageCache[cacheKey] = pageData;
+              if (pageData.length < pageSize) { // last page
+                pageData.forEach(o => { if ((o.label||'').toLowerCase().includes(qLow)) found.push(o); });
+                break;
+              }
+            }
+            pageData.forEach(o => { if (found.length < 8 && (o.label||'').toLowerCase().includes(qLow)) found.push(o); });
+            page++;
+          }
+
+          const objects = found.slice(0, 8);
           if (!objects.length) {
             sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Keine Ergebnisse für: ${q}</div>`;
             return;
