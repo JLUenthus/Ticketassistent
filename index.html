@@ -1349,7 +1349,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="modal-title" style="margin:0">🧪 Alles Test – Firma &amp; Tickets</div>
-          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.1</span>
+          <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);border:1px solid rgba(124,140,248,.3);color:var(--accent)">v2.2</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" id="alles-reset-btn" style="font-size:.72rem">↺ Zurücksetzen</button>
@@ -1437,7 +1437,7 @@
           </button>
         </div>
 
-        <div id="brrs-tab-content" style="font-size:.78rem;color:var(--muted)">Lädt…</div>
+        <div id="brrs-tab-content" style="font-size:.78rem;color:var(--muted);max-height:280px;overflow-y:auto">Lädt…</div>
       </div>
 
       <!-- Dashboard Panel -->
@@ -1471,7 +1471,7 @@
             📡 Monitoring
           </button>
         </div>
-        <div id="dashboard-tab-content" style="font-size:.78rem;color:var(--muted)">Lädt…</div>
+        <div id="dashboard-tab-content" style="font-size:.78rem;color:var(--muted);max-height:280px;overflow-y:auto">Lädt…</div>
       </div>
 
       <div style="height:1px;background:var(--border);margin-bottom:14px"></div>
@@ -1506,6 +1506,7 @@
 
       <!-- Tickets table -->
       <div id="alles-tickets-wrap" style="display:none">
+        <div style="max-height:280px;overflow-y:auto;border-radius:8px" id="alles-tickets-scroll">
         <div style="font-size:.68rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Aktuelle Tickets</div>
         <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden">
           <table style="width:100%;border-collapse:collapse;font-size:.78rem">
@@ -1520,6 +1521,7 @@
             </thead>
             <tbody id="alles-tickets-body"></tbody>
           </table>
+        </div>
         </div>
         <div id="alles-tickets-count" style="font-size:.7rem;color:var(--dim);margin-top:6px;text-align:right"></div>
       </div>
@@ -3770,7 +3772,8 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
         const objects = (window._firmaCache || []).filter(o => {
           const label = (o.label || o.name || '').toLowerCase();
           const key   = (o.objectKey || '').toLowerCase();
-          return isKey ? key.includes(qLow) : label.includes(qLow);
+          const nameAttr = getAttr(o, 18).toLowerCase();
+          return isKey ? key.includes(qLow) : label.includes(qLow) || nameAttr.includes(qLow);
         }).slice(0, 8);
         // Remove debug div
         sug.innerHTML = '';
@@ -3833,8 +3836,11 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           }
           const qLow = q.toLowerCase();
           const objects = (window._apCache || []).filter(o => {
-            const text = (o.label || o.name || '').toLowerCase();
-            return text.includes(qLow);
+            const label    = (o.label || o.name || '').toLowerCase();
+            const anzeige  = getAttr(o, 31).toLowerCase();
+            const vorname  = getAttr(o, 37).toLowerCase();
+            const nachname = getAttr(o, 38).toLowerCase();
+            return label.includes(qLow) || anzeige.includes(qLow) || vorname.includes(qLow) || nachname.includes(qLow);
           }).slice(0, 8);
           if (!objects.length) {
             sug.innerHTML = `<div style="padding:9px 14px;color:var(--dim);font-size:.78rem">Keine Ergebnisse für: ${q}</div>`;
@@ -4019,9 +4025,9 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
 
   // ── Dashboard ─────────────────────────────────────────────
   const DASH_JQLS = {
-    neu: `project = ESD AND status IN (Neu) AND "Tempo Team.name" = Helpdesk AND summary !~ Monitoring AND "request type" != "Abrechnungskonto Unterstützung (ESD)" AND "Request Type" != "Monitoring Incident (ESD)" AND (labels = EMPTY OR labels != REOPENED)`,
+    neu: `project = ESD AND status IN (Neu) AND summary !~ Monitoring AND "request type" != "Abrechnungskonto Unterstützung (ESD)" AND "Request Type" != "Monitoring Incident (ESD)" AND (labels = EMPTY OR labels != REOPENED) ORDER BY created DESC`,
     wartend: `project = "enthus Service Desk" AND issuetype IN standardIssueTypes() AND status NOT IN (Neu, Abgebrochen, Erledigt) AND summary !~ Monitoring AND "Tempo Team.name" in ("enthus.blue Operational Services", EMPTY) AND assignee = empty AND "request type" != "Abrechnungskonto Unterstützung (ESD)" AND "Request Type" != "Monitoring Incident (ESD)" ORDER BY assignee ASC`,
-    monitoring: `project = ESD AND "Tempo Team.name" = "enthus.blue Operational Services" AND (summary ~ Monitoring OR "Request Type" = "Monitoring Incident (ESD)") AND statusCategory != Done ORDER BY status ASC`
+    monitoring: `project = ESD AND (summary ~ Monitoring OR "Request Type" = "Monitoring Incident (ESD)") AND statusCategory != Done ORDER BY status ASC`
   };
 
   let _dashActiveTab = 'neu';
@@ -4096,7 +4102,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
 
   // ── BRRS Kundenprofil ────────────────────────────────────
   const BRRS_OBJECT_KEY = 'KUN-38869';
-  const BRRS_JQL = 'project = ESD AND "Customer[Object]" = "BRRS Rechtsanwälte" AND resolution is EMPTY ORDER BY created DESC';
+  const BRRS_JQL = 'project = ESD AND text ~ "BRRS" AND resolution is EMPTY ORDER BY created DESC';
 
   let _brrsActiveTab = 'tickets';
 
@@ -4167,13 +4173,8 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
           </table>`;
 
       } else if (tab === 'kontakte') {
-        // Load Ansprechpartner for BRRS from Assets cache or fresh
-        const allAp = window._apCache || await searchAssets('objectType = "Ansprechpartner (Kunde)"', 1500);
-        const brrs = allAp.filter(o => {
-          const firmaAttr = (o.attributes||[]).find(a => String(a.objectTypeAttributeId) === '40');
-          const firmaVal = firmaAttr?.objectAttributeValues?.[0]?.displayValue || '';
-          return firmaVal.toLowerCase().includes('brrs');
-        });
+        // Load BRRS Ansprechpartner directly – filter by objectKey of BRRS (KUN-38869)
+        const brrs = await searchAssets('objectType = "Ansprechpartner (Kunde)" AND "Firma" = "KUN-38869"', 100);
         if (!brrs.length) { content.innerHTML = '<div style="color:var(--dim)">Keine Ansprechpartner gefunden</div>'; return; }
         content.innerHTML = `
           <div style="margin-bottom:8px;font-size:.7rem;color:var(--dim)">${brrs.length} Ansprechpartner</div>
@@ -4194,7 +4195,7 @@ Prioritätswerte (NUR diese exakten Werte verwenden): Priorität 1 | Priorität 
 
       } else if (tab === 'konten') {
         // Load Abrechnungskonten for BRRS from Assets
-        const konten = await searchAssets('objectType = "Abrechnungskonto" AND "Firma (Kunde)" = "BRRS Rechtsanwälte"', 50);
+        const konten = await searchAssets('objectType = "Abrechnungskonto"', 200);
         if (!konten.length) { content.innerHTML = '<div style="color:var(--dim)">Keine Abrechnungskonten gefunden</div>'; return; }
         content.innerHTML = `
           <div style="margin-bottom:8px;font-size:.7rem;color:var(--dim)">${konten.length} Abrechnungskonten</div>
